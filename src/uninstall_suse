@@ -1,0 +1,116 @@
+#!/bin/sh 
+#
+# Script to remove the driver(s) from an existing SuSE linux install
+# 
+#
+# Copyright © 2006-2008 Ciprico Inc. All rights reserved.
+# Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
+#
+# Use of this software is subject to the terms and conditions of the written
+# software license agreement between you and DHS (the "License"),  
+# including, without limitation, the following (as further elaborated in the
+# License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND DHS DISCLAIMS
+# ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
+# BY CONDUCT, OR OTHERWISE; (ii) this software may be used only in connection
+# with the integrated circuit product and storage software with which it was
+# designed to be used; (iii) this source code is the confidential information
+# of DHS and may not be disclosed to any third party; and (iv) you may not
+# make any modification or take any action that would cause this software,
+# or any other Dot Hill software, to fall under any GPL license or any other
+# open source license.
+#
+
+drv_basename=rcraid
+
+KERNEL_CFG=/etc/sysconfig/kernel
+MODULES_CFG=/etc/modprobe.conf.local
+
+source ./common_shell
+
+# Restore all of the system files from the backups
+error_exit() {
+    if [ -f ${KERNEL_CFG}.bak ] ; then
+	mv -f ${KERNEL_CFG}.bak $KERNEL_CFG
+    fi
+
+    if [ -f ${MODULES_CFG}.bak ] ; then
+        mv -f ${MODULES_CFG}.bak $MODULES_CFG
+    fi
+
+    exit 1
+}
+
+if [ $UID != 0 ] ; then
+    echo "This script must be run as root"
+    exit 1
+fi
+
+if [ ! -f /etc/SuSE-release ] ; then
+    echo "This driver disk is for SuSE Linux."
+    exit 1
+fi
+
+suse_release=`awk '/^VERSION/ { print $3 }' /etc/SuSE-release`
+kernel_release=`uname -r`
+arch=`uname -i`
+
+if grep "Enterprise Server" /etc/SuSE-release ; then
+    suse_release=sles${suse_release}
+fi
+
+if grep "Enterprise Desktop" /etc/SuSE-release ; then
+    suse_release=sled${suse_release}
+fi
+
+driver_path=/lib/modules/${kernel_release}/kernel/drivers/scsi
+
+if [ ! -d linux/suse ] ; then
+    if [ ! -f Makefile ]; then
+        echo "Either this is not a driver diskette or sdk or you need to"
+        echo "cd to the directory where the disk is mounted"
+        exit 1
+    fi
+fi
+
+
+# Delete any installed drivers that match the current kernel configuration
+if [ -f $driver_path/$drv_basename/$drv_basename.ko ]; then
+    /bin/rm -rf $driver_path/$drv_basename
+    del_initrd_mod_suse $drv_basename $KERNEL_CFG
+fi
+
+# Remove driver from modules configuration file
+del_module_config $drv_basename $MODULES_CFG
+
+# Remove use_swl option if present
+del_swl_option $drv_basename $MODULES_CFG
+
+/sbin/depmod ${kernel_release} -a
+if [ $? -ne 0 ] ; then
+    echo "Failure running depmod"
+    error_exit
+fi
+
+initrd="/boot/initrd-${kernel_release}"
+if [ -e $initrd ]; then
+    cp -af $initrd $initrd.old || {
+	echo "couldn't save a copy of $initrd as $initrd.old... giving up"
+	error_exit
+    }
+    didinitrd=1
+else
+    didinitrd=0
+fi
+# can't write to initrd.new because mkinitrd updates the symlink if appropriate
+/sbin/mkinitrd -k "vmlinuz-${kernel_release}" -i $initrd
+if [ $? -ne 0 ] ; then
+    echo "Failed to build initrd"
+    # in case the initrd got botched
+    test $didinitrd = 1 && cp -a $initrd.old $initrd
+    error_exit
+fi
+
+rm -f ${KERNEL_CFG}.bak 
+rm -f ${MODULES_CFG}.bak
+echo
+echo "Removed $drv_basename driver for ${kernel_release}"

@@ -1,0 +1,237 @@
+#!/bin/sh 
+
+#  Script to install the driver into the /lib/modules tree for RedHat distros. 
+#  By default new drivers will be installed for the currently running kernel.
+#  This behavior can be modified by specifying a specific kernel version to 
+#  upgrade, or by providing a list of one or more kernel variants to install 
+#  the driver for.
+
+#
+# Copyright © 2006-2008 Ciprico Inc. All rights reserved.
+# Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
+#
+# Use of this software is subject to the terms and conditions of the written
+# software license agreement between you and DHS (the "License"),  
+# including, without limitation, the following (as further elaborated in the
+# License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND DHS DISCLAIMS
+# ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
+# BY CONDUCT, OR OTHERWISE; (ii) this software may be used only in connection
+# with the integrated circuit product and storage software with which it was
+# designed to be used; (iii) this source code is the confidential information
+# of DHS and may not be disclosed to any third party; and (iv) you may not
+# make any modification or take any action that would cause this software,
+# or any other Dot Hill software, to fall under any GPL license or any other
+# open source license.
+#
+
+drv_basename=rcraid
+kernel=
+flavors=
+sdk=
+
+USE_SWL="ahci,lsi1068,lsi2008"
+
+source ./common_shell
+
+while [ $# -gt 0 ] ; do
+    case $1 in
+	--help)
+	    usage_rh $0
+	    ;;
+	uni | smp | bigmem | hugemem | largesmp | PAE)
+	    case " $flavors " in
+		*" $1 "*) ;;
+		*) flavors="$flavors $1";;
+	    esac
+	    ;;
+        USE_SWL=*)
+            USE_SWL=${1:8}
+            ;;
+
+	*)
+	    if [ -z $kernel ] ; then
+		kernel=$1
+	    else
+		usage_rh $0
+	    fi
+	    ;;
+    esac
+    shift
+done
+
+# replace ,'s with spaces and remove "none"
+echo "SWL option: \"${USE_SWL}\""
+USE_SWL=${USE_SWL//,/ }
+USE_SWL=${USE_SWL//none/ }
+for swl in ${USE_SWL}; do
+    if lists_intersect $swl "${SWL_SUPPORTED}"; then
+        echo "$swl is not a supported SWL option"
+        usage_suse $0
+        exit 1
+    fi
+done
+
+if [ $UID != 0 ] ; then
+    echo "This script must be run as root"
+    exit 1
+fi
+
+if [ ! -e modules.cgz ] ; then
+    if [ ! -f Makefile ] ; then
+        echo "Either this is not a driver diskette or sdk or you need to cd to the" 
+        echo "directory where the disk is mounted"
+        exit 1
+    else
+        sdk="true"
+    fi
+fi
+
+set_kernel_flavors_rh
+
+if [ -z "$sdk" ] ; then
+    # Make sure driver disk contains drivers for this kernel.  If this is an
+    if cat os_version | grep -v $kernel > /dev/null ; then
+        echo "This disk does not contain any drivers for kernel version $kernel"
+        exit 1
+    fi
+    
+    # Verify that the disk contains drivers for this platform
+    platform=`uname -p`
+    if [[ $kernel = 2.6.* ]] && [ $platform = athlon ] ; then
+        platform=i686
+    fi
+    if cat platform | grep -v $platform > /dev/null ; then
+        echo "This disk dosen't contain drivers for $platform platform"
+        exit 1
+    fi
+
+    # Determine directory structure of the modules.cgz file
+    if [ -e rhdd ] ; then 
+        dd_format=2
+    elif [ -e rhdd-6.1 ] ; then
+        dd_format=1
+    else
+       echo "Unrecognized driver disk type"
+       exit 1
+    fi
+else
+    # Verify that the drivers have been built
+    if [ ! -f ${drv_basename}.ko ]; then
+        echo "Driver ${drv_basename}.ko not built"
+        echo "run: \"(cd ../; sh ./install [kernel [version]] )\" "
+        exit 1
+    fi
+    dd_format=3
+fi
+    
+mod_ext=ko
+mod_conf=/etc/modprobe.conf
+drvname=$drv_basename.$mod_ext
+
+tmpdir=`mktemp -d /tmp/$drv_basename.XXXXXX`
+if [ $? -ne 0 ] ; then
+    echo "Unable to create temporary directory"
+    exit 1
+fi
+
+dddir=`pwd`
+pushd $tmpdir  > /dev/null 2>&1
+
+if [ -z ${sdk} ]; then
+    zcat $dddir/modules.cgz | cpio -idum > /dev/null 2>&1
+fi
+
+for flavor in $flavors ; do
+
+    if [ $flavor = "uni" ] ; then
+	version=$kernel
+    else
+	version=$kernel$flavor
+    fi
+
+    # Copy the driver into the correct location in the /lib/modules tree. RH 9
+    # and RHEL 3 use different format for the modules.cgz file that dosen't
+    # have platform in the path.
+    if [ $dd_format -eq 1 ] ; then
+        from_dir=$version
+    elif [ $dd_format -eq 2 ]; then
+        from_dir=$version/$platform
+    else
+        from_dir="${dddir}"
+    fi
+
+    if [ ! -f $from_dir/$drvname ] ; then
+        # echo $from does not exist, skipping
+        continue;
+    fi
+
+    echo Installing $drvname driver for $version
+
+    # Remove any old copies of the driver
+    if [ -d /lib/modules/$version ] ; then
+	find /lib/modules/$version -name $drvname -exec rm {} \;
+    fi
+
+    # For Fedora Core 2 and later the driver is installed in the updates
+    # directory rather than kernel/drivers/scsi/$drv_basename
+    if [[ $kernel = 2.6.* ]] ; then
+	to_dir=/lib/modules/$version/updates
+    else
+        to_dir=/lib/modules/$version/kernel/drivers/scsi
+    fi
+
+    if [ ! -d $to_dir ] ; then
+       mkdir -p $to_dir
+    fi
+
+    cp -p $from_dir/$drvname $to_dir
+
+    # Identify driver as a scsi_hostadapter in modules/modprobe.conf
+    # It is first removed, then added because the value of USE_SWL may have
+    # changed which affects the ordering.
+    del_module_config $drv_basename $mod_conf
+    add_module_config $drv_basename $mod_conf "$USE_SWL"
+
+    # Possibly add rcraid "use_swl=0" option
+    add_swl_option $drv_basename $mod_conf "$USE_SWL"
+
+    # Add the driver to the initrd if necessary
+    map_file=/boot/System.map-$version
+    if [ -f $map_file ] ; then
+	/sbin/depmod -a -F $map_file $version
+        INITRD_OPTS=
+
+        # if any USE_SWL module is being used, then, and only then, do
+        # we want to make sure RAIDCore drivers load first
+        add_first=0
+        for swl in ${USE_SWL}; do
+            module=SWL_MODULE_${swl}
+            if check_module_config ${!module} ${mod_conf}; then
+                # a ${use_swl} module exists, so add ${driver} first
+                add_first=1
+            fi
+        done
+        if [ ${add_first} = 1 ]; then
+            # add RAIDCore drivers first
+            INITRD_OPTS="--preload $drv_basename"
+        fi
+
+	initrd=/boot/initrd-$version.img
+	if [ -f $initrd ]; then
+	    echo "Making initrd $initrd with: $INITRD_OPTS"
+	    /sbin/mkinitrd $INITRD_OPTS -f $initrd.new $version
+	    if [ $? -ne 0 ] ; then
+		echo Failed to make $initrd
+		continue
+	    fi
+	    mv -f $initrd.new $initrd
+
+	    if [ -e /etc/lilo.conf ] ; then
+		/sbin/lilo
+	    fi
+	fi
+    fi
+done
+
+popd  > /dev/null 2>&1
+rm -rf $tmpdir

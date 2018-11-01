@@ -1,0 +1,212 @@
+#!/bin/sh
+
+#  Script to install the RAIDCore drivers from the SDK for supported platforms
+#  (RedHat and SuSE). 
+
+#
+# Copyright © 2006-2008 Ciprico Inc. All rights reserved.
+# Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
+#
+# Use of this software is subject to the terms and conditions of the written
+# software license agreement between you and DHS (the "License"),  
+# including, without limitation, the following (as further elaborated in the
+# License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND DHS DISCLAIMS
+# ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
+# BY CONDUCT, OR OTHERWISE; (ii) this software may be used only in connection
+# with the integrated circuit product and storage software with which it was
+# designed to be used; (iii) this source code is the confidential information
+# of DHS and may not be disclosed to any third party; and (iv) you may not
+# make any modification or take any action that would cause this software,
+# or any other Dot Hill software, to fall under any GPL license or any other
+# open source license.
+#
+
+source src/common_shell
+
+USE_SWL="ahci,lsi1068,lsi2008"
+
+install_modules(){
+    (cd src; sh ./$1 $2 $3 $4 $5)
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to install the RAIDCORE Drivers."
+        exit 1
+    fi
+}
+
+build_modules(){
+    KERNELMAKEFILE=/lib/modules/$1/build/Makefile
+    buildfailed=0
+
+    if [ -f $KERNELMAKEFILE ]; then
+        (cd src; make clean; make KVERS=$1 all);
+        if [ $? -ne 0 ]; then
+            buildfailed=1
+        fi
+    else
+        buildfailed=1
+    fi
+
+    if [ $buildfailed -eq 1 ]; then	
+        echo "ERROR: Failed to build the RAIDCORE Drivers."
+        echo "Please make sure kernel source rpm is installed for $1."
+        exit 1
+    fi
+}
+
+# Builds and installs the driver for SuSE variants
+build_and_install_SuSE(){
+    # If no kernel version was provided, first check for the kernel
+    # pointed to by /usr/src/linux, then default to the currently running
+    # kernel.
+    if [ -L /usr/src/linux ]; then
+        kernel=`file -b /usr/src/linux`
+        if [ ${kernel:0:6} == "broken" ]; then
+            kernel=
+	else
+            kernel=${kernel/symbolic link to \`linux-}
+            kernel=${kernel/\'}
+            # assume the same flavor (default smp bigsmp pae) as running 
+            # kernel
+            base=`uname -r | awk '{sub("default","",$0); 
+                                   sub("bigsmp","",$0);
+                                   sub("smp","",$0);
+                                   sub("pae","",$0);
+                                   print $0}'`
+            flavor=`uname -r`
+            flavor=${flavor/$base}
+            kernel=${kernel}-${flavor}
+        fi
+    fi
+    if [ -z "$kernel" ] ; then
+        kernel=`uname -r`
+    fi
+    build_modules $kernel
+    if [ -f "src/rcraid.ko" ] ; then
+        install_modules install_suse "USE_SWL=${USE_SWL}" $kernel
+    else
+        echo "#"
+        echo "# Driver module not built -- install aborted!"
+        echo "#"
+    fi
+}
+
+# Builds and installs the driver for RedHat variants
+build_and_install_rh(){
+    set_kernel_flavors_rh
+    for flavor in $flavors ; do
+        if [ $flavor = "uni" ] ; then
+            version=$kernel
+        else
+            version=$kernel$flavor
+        fi
+                
+        build_modules $version
+        if [ -f "src/rcraid.ko" ] ; then
+            install_modules install_rh "USE_SWL=${USE_SWL}" $version
+        else
+            echo "#"
+            echo "# Driver module not built -- install aborted!"
+            echo "#"
+        fi
+    done
+}
+
+build_and_install_ubuntu(){
+    KERNELS=$(ls /lib/modules)
+    
+    ln -s rcblob.i386 src/rcblob.i686
+
+    for RELEASE in $KERNELS
+    do
+	    echo "Make kernel for $RELEASE"
+	    make -C src clean
+	    make -C src KVERS=$RELEASE
+
+        if [ -f "src/rcraid.ko" ] ; then
+	        ## update modules.dep
+	        mv /lib/modules/$RELEASE/kernel/drivers/scsi/rcraid.ko /lib/modules/$RELEASE/kernel/drivers/scsi/rcraid.ko.bak
+	        cp -ap src/rcraid.ko /lib/modules/$RELEASE/kernel/drivers/scsi/rcraid.ko
+	        depmod -a $RELEASE
+
+	        ## make new initrd.img
+	        cp -ap /boot/initrd.img-$RELEASE /boot/initrd.img-$RELEASE.bak
+
+	        #rm -rf /etc/modprobe.d/blacklist.local.conf
+	        mkinitramfs -o /boot/initrd.img-$RELEASE $RELEASE
+        else
+            echo "#"
+            echo "# Driver module not built -- install aborted!"
+            echo "#"
+        fi
+    done
+    
+}
+
+########
+# MAIN #
+########
+
+if [ $UID != 0 ] ; then
+    echo "This script must be run as root"
+    exit 1
+fi
+
+if [ -e /etc/redhat-release ]; then
+    # redhat based
+    while [ $# -gt 0 ] ; do
+        case $1 in
+            --help) 
+                usage_rh $1
+                ;;
+            USE_SWL=*)
+                USE_SWL=${1:8}
+                ;;
+            uni | smp | bigmem | hugemem | largesmp | PAE)
+                case " $flavors " in
+                    *" $1 "*) ;;
+                    *) flavors="$flavors $1";;
+                esac
+                ;;
+            *)
+                if [ -z $kernel ] ; then
+                    kernel=$1
+                else
+                    usage_rh $1
+                fi
+                ;;
+        esac
+        shift
+    done
+    build_and_install_rh
+elif [ -e /etc/SuSE-release ]; then
+    # SuSE based
+    while [ $# -gt 0 ] ; do
+        case $1 in
+            --help)
+                usage_suse $1
+                ;;
+        USE_SWL=*)
+            USE_SWL=${1:8}
+            ;;
+        *)
+            if [ -z "$kernel" ] ; then
+                kernel=$1
+            else
+                usage_suse $1
+            fi
+            ;;
+        esac
+        shift
+    done
+    build_and_install_SuSE
+else  
+    # generic
+    UBUNTU_RELEASE=$(grep 'Ubuntu' /etc/lsb-release)
+    if [ -z UBUNTU_RELEASE ]; then
+	(cd src; make clean; make all; make install);
+           
+    else    
+        build_and_install_ubuntu
+    fi
+    exit $?
+fi

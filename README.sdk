@@ -1,0 +1,50 @@
+=================================================================
+RAIDCore LINUX SDK README
+
+Copyright (c) 2006.  Broadcom Corporation.  All rights reserved.
+Copyright (c) 2006-2008 Ciprico Inc.  All rights reserved.
+Copyright (c) 2008-2013 Dot Hill Systems Corp.  All rights reserved.
+=================================================================
+
+These instructions apply to building AMD AMD-RAID drivers
+on Linux systems.
+
+It is possible to build the driver for many distributions based on Linux
+version 2.6 kernels without having the complete kernel source tree available.
+
+Simply running the command 'make install' in the src/ directory with no
+arguments will make the driver for the currently running kernel and install it.
+
+To build and install the driver for a recently updated kernel before rebooting
+into the new kernel version, use the KVERS make argument to override the kernel
+version.  For example:
+
+    make KVERS=2.6.18-164.el5       install      # Red Hat 5.4
+    make KVERS=2.6.27.19-5-default  install      # SLES 11.0
+
+You can override both the kernel version and the location of the kernel objects
+when doing the make for custom kernels or unsupported distributions.
+For example:
+
+    make KVERS=2.6.30.3-mykern install
+    make KVERS=2.6.30.3-mykern KDIR=/test/lib/modules/2.6.30.3-mykern install
+
+On supported Red Hat and SLES systems, the "install" make target will run
+the appropriate script that will complete the installation by updating module
+configuration files and rebuilding the initrd image.
+
+On unsupported systems, the driver modules will be copied to the scsi module
+lib directory of the specified kernel and nothing else is done.  It is up to
+the user to perform any additional steps (especially if booting off the
+AMD-RAID controller).  Additional steps that you may need to take
+include:
+
+        o run 'depmod -a'
+        o make a new /boot/initrd-{KERNEL_VERSION}.img image that
+          includes AMD-RAID drivers (typically with /sbin/mkinitrd)
+
+Consult your system documentation for the exact steps necessary and the syntax
+of the commands.
+
+Product Version: 8.1.0
+Product Build: 8.1.0-00039

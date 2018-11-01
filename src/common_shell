@@ -1,0 +1,301 @@
+#!/bin/sh
+
+# Common shell routines used by the top level install script (SDK and driver
+# disks) and also from the OS specific scripts in the SDK (also contains
+# uninstall routines used in multiple places)
+#
+# Copyright © 2006-2008 Ciprico Inc. All rights reserved.
+# Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
+#
+# Use of this software is subject to the terms and conditions of the written
+# software license agreement between you and DHS (the "License"),  
+# including, without limitation, the following (as further elaborated in the
+# License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND DHS DISCLAIMS
+# ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
+# BY CONDUCT, OR OTHERWISE; (ii) this software may be used only in connection
+# with the integrated circuit product and storage software with which it was
+# designed to be used; (iii) this source code is the confidential information
+# of DHS and may not be disclosed to any third party; and (iv) you may not
+# make any modification or take any action that would cause this software,
+# or any other Dot Hill software, to fall under any GPL license or any other
+# open source license.
+#
+# defines for SWL (Software Licensing) - SATA chipsets on motherboards
+# that are supported by RAIDCore(tm)
+SWL_SUPPORTED="ahci lsi1068 lsi2008"
+SWL_MODULE_ahci=ahci
+SWL_MODULE_lsi1068=mptsas
+SWL_MODULE_lsi2008=mpt2sas
+# WARNING: these need to be kept in sync with RC_SWL_TYPE_XXX in bc_adapter.h
+SWL_TYPE_ahci=0x00000002
+SWL_TYPE_lsi1068=0x00000004
+SWL_TYPE_lsi2008=0x00000008
+
+function usage_suse() {
+    echo "usage: `basename $0` [<options>][<kernel>]" >&2
+    echo "  options:" >&2
+    echo "    USE_SWL=[none,ahci,lsi1068,lsi2008] - comma seperated list of onboard chips RAIDCore " >&2
+    echo "                                 should use.  Default is all." >&2
+    echo "  ex: `basename $0` USE_SWL=ahci 2.6.16.21-0.25-smp" >&2
+    exit 1
+}
+
+function usage_rh() {
+    echo "usage: `basename $0` [<options>][<kernel>] [<smp|hugemem|largesmp|PAE>]" >&2
+    echo "  options:" >&2
+    echo "    USE_SWL=[none,ahci,lsi1068,lsi2008] - comma seperated list of onboard chips RAIDCore " >&2
+    echo "                                 should use.  Default is all." >&2
+    echo "  ex: `basename $0` USE_SWL=ahci 2.6.20-1.2933.fc6 uni smp" >&2
+    exit 1
+}
+
+# return 1 if two lists intersect
+function lists_intersect() {
+    local list1=$1
+    local list2=$2
+    local elem1
+    local elem2
+
+    for elem1 in ${list1}; do
+        for elem2 in ${list2}; do
+            if [ "$elem1" == "$elem2" ]; then
+                return 1
+            fi
+        done
+    done
+   
+    return 0
+}
+
+# $kernel and $flavors if they are not already set
+function set_kernel_flavors_rh() {
+    # If no kernel version is provided then installing for all flavors
+    # of currently running version
+    if [ -z "$kernel" ] ; then
+        kernel=`uname -r | awk '{sub("BOOT","",$0)
+                                 sub("hugemem","",$0)
+                                 sub("largesmp","",$0)
+                                 sub("smp","",$0)
+                                 sub("PAE","",$0)
+                                 print $0}'`
+    else
+        # 2.6.15-1.2054_FC5smp should be manipulated as kernel=2.6.15-1.2054_FC5
+        # and flavors=smp
+        kernelstr=$kernel
+        kernel=`echo $kernel | awk '{sub("BOOT","",$0)
+                                     sub("hugemem","",$0)
+                                     sub("largesmp","",$0)
+                                     sub("smp","",$0)
+                                     sub("PAE","",$0)
+                                     print $0}'`
+        flavor=`echo $kernelstr | sed "s/"$kernel"//"`
+        if [ -n "$flavor" ] ; then
+            flavors="$flavor"
+        else
+            flavors="uni"
+        fi
+    fi
+
+    if [ -z "$flavors" ] ; then
+        # Check for installed versions of requested kernel
+        base=$kernel
+        installed=`find /lib/modules -maxdepth 1 -name ${base}* -type d -printf "%f "`
+        # If that dosen't work get installed versions of currently running 
+        # kernel.
+        if [ -z "$installed" ] ; then
+            base=$kernel
+            installed=`find /lib/modules -maxdepth 1 -name ${base}* -type d -printf "%f "`
+        fi
+
+        for i in $installed ; do
+            flavor=`echo $i | sed -e s/$base//`
+            if [ -z "$flavor" ]; then
+                flavor="uni"
+            fi
+            flavors="$flavors $flavor"
+        done
+    fi
+}
+
+# check if $1 scsi_hostadapater is already in module config file $2
+function check_module_config() {
+    local driver=$1
+    local mod_conf=$2
+
+    egrep ^[[:space:]]*alias[[:space:]]+scsi_hostadapter[[:digit:]]*[[:space:]]+$driver $mod_conf > /dev/null 2>&1
+    return $?
+}
+
+# Add driver $1 scsi_hostadapter entry to module configuration file $2
+function add_module_config() {
+    local driver=$1
+    local mod_conf=$2
+    local use_swl=$3
+    local swl
+    local module
+    local add_first=0
+
+    # in an attempt to not cause disk reordering if possile, rcraid is added
+    # to the front only if any USE_SWL module exists, otherwise it is added
+    # at the end.
+
+    if ! check_module_config ${driver} ${mod_conf} ; then
+        # ${driver} is not already there, so it will need to be added
+        for swl in ${use_swl}; do
+            module=SWL_MODULE_${swl}
+            if check_module_config ${!module} ${mod_conf}; then
+                # a ${use_swl} module exists, so add ${driver} first
+                add_first=1
+            fi
+        done
+        if [ ${add_first} = 1 ]; then
+            # add RAIDCore driver first
+            echo "alias scsi_hostadapter $driver" > ${mod_conf}.tmp
+            cat ${mod_conf} >> ${mod_conf}.tmp
+            mv ${mod_conf}.tmp ${mod_conf}
+        else
+            # add RAIDCore driver last
+            echo "alias scsi_hostadapter $driver" >> ${mod_conf}
+        fi
+    fi
+}
+
+# Remove driver $1 from module configuration file $2
+function del_module_config() {
+    local driver=$1
+    local mod_conf=$2
+
+    if [ -f ${mod_conf} ] ; then
+        if check_module_config ${driver} ${mod_conf} ; then
+            sed -r "/^[[:space:]]*alias[[:space:]]+scsi_hostadapter[[:space:]]+${driver}/d" ${mod_conf} > ${mod_conf}.tmp
+            mv -f ${mod_conf}.tmp ${mod_conf}
+        fi
+    fi
+}
+
+# Add use_swl support option for driver $1 to module configuration file $2 
+# if needed
+function add_swl_option() {
+    local driver=$1
+    local mod_conf=$2
+    local use_swl=$3
+    local swl_flag
+    local swl
+    local type
+
+    if [ "${driver}" == "rcraid" ]; then
+        # first remove any existing use_swl setting in case of a reinstall
+        del_swl_option ${driver} ${mod_conf} 
+
+        # calculate new use_swl flag value
+        swl_flag=1 # 0x00000001 represents all RAIDCore cards
+        for swl in ${use_swl}; do
+            type=SWL_TYPE_${swl}
+            swl_flag=$(( ${swl_flag} + ${!type} ))
+        done
+    
+        # add new value
+        echo "options ${driver} use_swl=${swl_flag}" >> ${mod_conf}
+    fi
+}
+
+# Remove use_swl support option for driver $1 from module configuration file $2
+function del_swl_option() {
+    local driver=$1
+    local mod_conf=$2
+
+    if [ "${driver}" == "rcraid" ]; then
+        if [ -f ${mod_conf} ] ; then
+            if egrep ^[[:space:]]*options[[:space:]]+${driver}[[:space:]]+use_swl* ${mod_conf} > /dev/null ; then
+                sed -r "/^[[:space:]]*options[[:space:]]+${driver}[[:space:]]+use_swl*/d" ${mod_conf} > ${mod_conf}.tmp
+                mv -f ${mod_conf}.tmp ${mod_conf}
+            fi
+	    # remove legacy use_roc name
+            if egrep ^[[:space:]]*options[[:space:]]+${driver}[[:space:]]+use_roc* ${mod_conf} > /dev/null ; then
+                sed -r "/^[[:space:]]*options[[:space:]]+${driver}[[:space:]]+use_roc*/d" ${mod_conf} > ${mod_conf}.tmp
+                mv -f ${mod_conf}.tmp ${mod_conf}
+            fi
+        fi
+    fi
+}
+
+# Add an initrd module for SuSE systems
+# Note: INITRD_MODULES comes from the $kernel_cfg file
+add_initrd_mod_suse() {
+    local driver=$1
+    local kernel_cfg=$2
+    local use_swl=$3
+    local swl
+    local updated=0
+    local add_first=0
+    local module
+
+    if [ -f $kernel_cfg ] ; then
+        source $kernel_cfg
+    else
+        echo "invalid kernel config file: $kernel_cfg"
+        exit 1
+    fi
+
+    if [ -z "$INITRD_MODULES" ] ; then
+        INITRD_MODULES=${driver}
+        updated=1
+    else
+        # if USE_SWL is set AND one of the USE_SWL modules is already being 
+        # used, then, and only then, we need the RAIDCore driver to load first,
+        # but the RAIDCore configuration device should still always be last
+        if echo $INITRD_MODULES | grep -v ${driver} > /dev/null ; then
+            for swl in ${use_swl}; do
+                module=SWL_MODULE_${swl}
+                if ! echo $INITRD_MODULES | grep -v ${!module} > /dev/null; then
+                    add_first=1
+                fi
+            done
+            if [ ${add_first} = 1 ]; then
+                INITRD_MODULES="${driver} $INITRD_MODULES"
+            else
+                INITRD_MODULES="$INITRD_MODULES ${driver}"
+            fi
+            updated=1
+        fi
+    fi
+
+    if [ $updated = 1 ] ; then
+        if [ -f $kernel_cfg ] ; then
+            if grep INITRD_MODULES $kernel_cfg > /dev/null ; then
+                cat $kernel_cfg | sed -e s/^INITRD_MODULES=.*$/INITRD_MODULES=\""$INITRD_MODULES"\"/ > $kernel_cfg.tmp
+                mv $kernel_cfg.tmp $kernel_cfg
+            else
+                echo INITRD_MODULES=\"$INITRD_MODULES\" >> $kernel_cfg
+            fi
+        else
+            echo INITRD_MODULES=\"$INITRD_MODULES\" >> $kernel_cfg
+        fi
+    fi
+}
+
+# Remove an initrd module for SuSE systems
+# Note: INITRD_MODULES comes from the $kernel_cfg file
+del_initrd_mod_suse() {
+    local driver=$1
+    local kernel_cfg=$2
+    local updated=0
+
+    if [ -f $kernel_cfg ] ; then
+        source $kernel_cfg
+        if [ -n "$INITRD_MODULES" ] ; then
+            if echo $INITRD_MODULES | grep ${driver} > /dev/null; then
+                INITRD_MODULES=${INITRD_MODULES//${driver}/}
+                updated=1
+            fi
+        fi
+    else
+        echo "invalid kernel config file: $kernel_cfg"
+        exit 1
+    fi
+
+    if [ $updated = 1 ] ; then
+        cat $kernel_cfg | sed -e s/^INITRD_MODULES=.*$/INITRD_MODULES=\""$INITRD_MODULES"\"/ > $kernel_cfg.tmp
+        mv $kernel_cfg.tmp $kernel_cfg
+    fi
+}
