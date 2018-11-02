@@ -1,0 +1,8 @@
+rcraid (8.1.0) bionic; urgency=low
+
+   * Initial release
+   * Automatic install into initramfs
+   * Automatic builds via dkms
+
+ -- Thomas Karl Pietrowski <thopiekar@gmail.com>  Fri, 02 Nov 2018 01:03:36 +0100
+

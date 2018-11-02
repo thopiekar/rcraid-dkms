@@ -1,0 +1,27 @@
+Source: rcraid
+Section: kernel
+Priority: optional
+Maintainer: Thomas Karl Pietrowski <thopiekar@gmail.com>
+Build-Depends: debhelper (>= 9), dkms
+Standards-Version: 3.9.8
+
+Package: rcraid
+Architecture: linux-amd64
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+ rcraid-dkms,
+ linux-headers-amd64 | linux-headers-generic
+Description: AMD RAIDXpert driver - metapackage
+ .
+
+Package: rcraid-dkms
+Architecture: linux-amd64
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends},
+ dkms
+Description: DKMS module for AMD RAIDXpert (rcraid)
+ .
+
+
