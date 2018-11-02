@@ -351,7 +351,7 @@ typedef struct rc_send_arg_s {
 			//
 			//    Sent to STH from driver
 			//
-			void *controller_handle;            
+			void *controller_handle;
 		} interrupt_call;
 		struct {
 			struct rc_srb_s *srb;
@@ -510,7 +510,7 @@ typedef struct rc_interface_s {
     rc_function_t *send_function;
 	struct rc_send_arg_s *send_arg;
     void *check_interrupt_arg;
-    
+
 
 	rc_function_t *receive_function;
     rc_function_t *schedule_dpc_function;

@@ -1,13 +1,13 @@
-#!/bin/sh 
+#!/bin/sh
 #
 # Script to remove the driver(s) from an existing SuSE linux install
-# 
+#
 #
 # Copyright © 2006-2008 Ciprico Inc. All rights reserved.
 # Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
 #
 # Use of this software is subject to the terms and conditions of the written
-# software license agreement between you and DHS (the "License"),  
+# software license agreement between you and DHS (the "License"),
 # including, without limitation, the following (as further elaborated in the
 # License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND DHS DISCLAIMS
 # ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
@@ -110,7 +110,7 @@ if [ $? -ne 0 ] ; then
     error_exit
 fi
 
-rm -f ${KERNEL_CFG}.bak 
+rm -f ${KERNEL_CFG}.bak
 rm -f ${MODULES_CFG}.bak
 echo
 echo "Removed $drv_basename driver for ${kernel_release}"

@@ -149,11 +149,11 @@ typedef struct rc_softstate  {
 	struct rc_srb_queue_s  srb_done;
 	struct rc_mop_queue_s  mop_done;
 	struct tasklet_struct  intr_tasklet;
-    
+
     struct delayed_work resume_work;
     int is_suspended;
     uint                   adapter_is_suspended;
-    
+
 	atomic_t               intr_pending;
 	rc_stats_t             stats;
 } rc_softstate_t;

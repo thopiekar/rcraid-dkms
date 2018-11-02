@@ -19,6 +19,7 @@
  *
  ****************************************************************************/
 
+#include "linux/signal.h"
 #include "linux/vmalloc.h"
 #include "linux/wait.h"
 #include "linux/sched.h"
@@ -350,7 +351,7 @@ rc_mem_clear_list(rc_sg_list_t *dst, int byte_count)
 				dst_page = pfn_to_page(pfn);
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                 dst_vaddr = kmap_atomic(dst_page);
-#else				
+#else
                 dst_vaddr = kmap_atomic(dst_page, KM_USER1);
 #endif
 				if (dst_vaddr == 0)
@@ -389,7 +390,7 @@ rc_mem_clear_list(rc_sg_list_t *dst, int byte_count)
 				if (dst_page)
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                     kunmap_atomic(dst_vaddr);
-#else	                
+#else
 					kunmap_atomic(dst_vaddr, KM_USER1);
 #endif
 				dst_page = (struct page *)0;
@@ -409,7 +410,7 @@ rc_mem_clear_list(rc_sg_list_t *dst, int byte_count)
 	if (dst_page)
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
         kunmap_atomic(dst_vaddr);
-#else	                    
+#else
 		kunmap_atomic(dst_vaddr, KM_USER1);
 #endif
 	if (residual)
@@ -489,14 +490,14 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 				src_page = pfn_to_page(pfn);
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                 src_vaddr = kmap_atomic(src_page);
-#else				                
+#else
 				src_vaddr = kmap_atomic(src_page, KM_USER0);
-#endif                
+#endif
 				if (src_vaddr == 0) {
 					if (dst_page)
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                         kunmap_atomic(dst_vaddr);
-#else			                    
+#else
 						kunmap_atomic(dst_vaddr, KM_USER1);
 #endif
 					ret = 0;
@@ -537,14 +538,14 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 				dst_page = pfn_to_page(pfn);
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                 dst_vaddr = kmap_atomic(dst_page);
-#else	                   
+#else
 				dst_vaddr = kmap_atomic(dst_page, KM_USER1);
-#endif                
+#endif
 				if (dst_vaddr == 0) {
 					if (src_page)
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                         kunmap_atomic(src_vaddr);
-#else	                            
+#else
 						kunmap_atomic(src_vaddr, KM_USER0);
 #endif
 					ret = 0;
@@ -595,9 +596,9 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 				if (src_page)
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                     kunmap_atomic(src_vaddr);
-#else	                         
+#else
 					kunmap_atomic(src_vaddr, KM_USER0);
-#endif                    
+#endif
 				src_page = (struct page *)0;
 				if (src_offset == src->sg_elem[src_idx].size) {
 					src_idx++;
@@ -615,9 +616,9 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 				if (dst_page)
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                     kunmap_atomic(dst_vaddr);
-#else	                                         
+#else
 					kunmap_atomic(dst_vaddr, KM_USER1);
-#endif                    
+#endif
 				dst_page = (struct page *)0;
 				if (dst_offset == dst->sg_elem[dst_idx].size) {
 					dst_idx++;
@@ -636,13 +637,13 @@ out:
 	if (src_page)
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
         kunmap_atomic(src_vaddr);
-#else	                          
+#else
 		kunmap_atomic(src_vaddr, KM_USER0);
-#endif        
+#endif
 	if (dst_page)
 #if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
         kunmap_atomic(dst_vaddr);
-#else	                          
+#else
 		kunmap_atomic(dst_vaddr, KM_USER1);
 #endif
 	if (residual)
@@ -1081,11 +1082,11 @@ rc_kthread_mem_user_copy(rc_thread_t *tp, rc_mem_op_t *mop)
 	void* src;
     void* dst;
     unsigned long numberOfBytes=0, byte_count=0;;
-    
+
     src = (void *) (uintptr_t) mop->mem.cp.src;
     dst = (void *) (uintptr_t) mop->mem.cp.dst;
     byte_count = mop->mem.cp.byte_count;
-   
+
     numberOfBytes = copy_to_user( dst, src, byte_count);
 
     if (numberOfBytes) {

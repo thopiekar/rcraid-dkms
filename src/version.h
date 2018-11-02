@@ -32,7 +32,7 @@
 #define RC_MK_BUILD_VER(RC_BUILD_VER_MAJOR, RC_BUILD_VER_MINOR, RC_BUILD_VER_PATCH) \
                   RC_STRINGIFY(RC_BUILD_VER_MAJOR)"." \
                   RC_STRINGIFY(RC_BUILD_VER_MINOR)"." \
-                  RC_STRINGIFY(RC_BUILD_VER_PATCH) 
+                  RC_STRINGIFY(RC_BUILD_VER_PATCH)
 
 #define VER_COMPANYNAME_STR       "AMD, Inc."
 #define VER_PRODUCT_STR           "AMD-RAID"

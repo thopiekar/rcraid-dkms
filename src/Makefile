@@ -60,7 +60,7 @@ all: bbanner
 	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
 
 clean:
-	@rm -f *.o *.ko vers.c .*.cmd .*.d 
+	@rm -f *.o *.ko vers.c .*.cmd .*.d
 	@rm -f rcraid.mod.c Module.symvers Modules.symvers
 	@rm -rf .tmp_versions Module.markers modules.order
 

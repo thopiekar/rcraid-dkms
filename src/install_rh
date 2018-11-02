@@ -1,9 +1,9 @@
-#!/bin/sh 
+#!/bin/sh
 
-#  Script to install the driver into the /lib/modules tree for RedHat distros. 
+#  Script to install the driver into the /lib/modules tree for RedHat distros.
 #  By default new drivers will be installed for the currently running kernel.
-#  This behavior can be modified by specifying a specific kernel version to 
-#  upgrade, or by providing a list of one or more kernel variants to install 
+#  This behavior can be modified by specifying a specific kernel version to
+#  upgrade, or by providing a list of one or more kernel variants to install
 #  the driver for.
 
 #
@@ -11,7 +11,7 @@
 # Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
 #
 # Use of this software is subject to the terms and conditions of the written
-# software license agreement between you and DHS (the "License"),  
+# software license agreement between you and DHS (the "License"),
 # including, without limitation, the following (as further elaborated in the
 # License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND DHS DISCLAIMS
 # ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
@@ -78,7 +78,7 @@ fi
 
 if [ ! -e modules.cgz ] ; then
     if [ ! -f Makefile ] ; then
-        echo "Either this is not a driver diskette or sdk or you need to cd to the" 
+        echo "Either this is not a driver diskette or sdk or you need to cd to the"
         echo "directory where the disk is mounted"
         exit 1
     else
@@ -94,7 +94,7 @@ if [ -z "$sdk" ] ; then
         echo "This disk does not contain any drivers for kernel version $kernel"
         exit 1
     fi
-    
+
     # Verify that the disk contains drivers for this platform
     platform=`uname -p`
     if [[ $kernel = 2.6.* ]] && [ $platform = athlon ] ; then
@@ -106,7 +106,7 @@ if [ -z "$sdk" ] ; then
     fi
 
     # Determine directory structure of the modules.cgz file
-    if [ -e rhdd ] ; then 
+    if [ -e rhdd ] ; then
         dd_format=2
     elif [ -e rhdd-6.1 ] ; then
         dd_format=1
@@ -123,7 +123,7 @@ else
     fi
     dd_format=3
 fi
-    
+
 mod_ext=ko
 mod_conf=/etc/modprobe.conf
 drvname=$drv_basename.$mod_ext

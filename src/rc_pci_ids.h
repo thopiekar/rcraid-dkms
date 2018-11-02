@@ -4,7 +4,7 @@
  * Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
  *
  * Use of this software is subject to the terms and conditions of the written
- * software license agreement between you and DHS (the "License"), 
+ * software license agreement between you and DHS (the "License"),
  * including, without limitation, the following (as further elaborated in the
  * License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND DHS DISCLAIMS
  * ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
@@ -84,7 +84,7 @@
 #define RC_PD_DID_AHCI_0B           0x7804 // AMD BOLTON AHCI Driver
 #define RC_PD_DID_CBSR              0x7805 // AMD Client Bolton    SWL 10
                                            // AMD Server Riverside SWL 50
-#define RC_PD_DID_BRISTOL           0x7905 // PCIe AMD Bristol RAID mode 
+#define RC_PD_DID_BRISTOL           0x7905 // PCIe AMD Bristol RAID mode
 #define RC_PD_DID_PROMONTORY        0x43BD // PCIe AMD Promontory Chipset
 #define RC_PD_DID_SUMMIT            0x7916 // PCIe AMD Summit RAID mode
 #define RC_PD_DID_LSI1068E          0x0058 // PCIe LSI1068 Adapater

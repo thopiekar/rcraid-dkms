@@ -9,7 +9,7 @@
 *   Copyright (c) 2006-2008, Ciprico Inc.  All rights reserved.
 *   Copyright (c) 2008-2013, Dot Hill Systems Corp.  All rights reserved.
 *
-\****************************************************************************/ 
+\****************************************************************************/
 
 #ifndef _RC_BUILD_NUMBER_H
 #define _RC_BUILD_NUMBER_H

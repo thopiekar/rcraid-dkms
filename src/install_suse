@@ -1,6 +1,6 @@
-#!/bin/sh 
+#!/bin/sh
 
-#  Script to install the driver into the /lib/modules tree for SuSE distros. 
+#  Script to install the driver into the /lib/modules tree for SuSE distros.
 #  By default new drivers will be installed for the currently running kernel.
 #  This behavior can be modified by specifying a specific kernel version to
 #  upgrade.
@@ -10,7 +10,7 @@
 # Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
 #
 # Use of this software is subject to the terms and conditions of the written
-# software license agreement between you and DHS (the "License"),  
+# software license agreement between you and DHS (the "License"),
 # including, without limitation, the following (as further elaborated in the
 # License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND DHS DISCLAIMS
 # ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
@@ -104,7 +104,7 @@ if grep "Enterprise Desktop" /etc/SuSE-release ; then
     suse_release=sled${suse_release}
 fi
 
-if [ ! -d linux/suse ] ; then 
+if [ ! -d linux/suse ] ; then
     if [ ! -f Makefile ]; then
         echo "Either this is not a driver diskette or sdk or you need to"
         echo "cd to the directory where the disk is mounted"
@@ -188,7 +188,7 @@ if [ $? -ne 0 ] ; then
     error_exit
 fi
 
-rm -f ${KERNEL_CFG}.bak 
+rm -f ${KERNEL_CFG}.bak
 rm -f ${MODULES_CFG}.bak
 rm -rf /tmp/install
 echo

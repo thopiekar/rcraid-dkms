@@ -49,7 +49,7 @@
 #include <linux/sysctl.h>
 #include <linux/pm_runtime.h>
 
-// FIXME: some older kernels still supported by RAIDCore do not have 
+// FIXME: some older kernels still supported by RAIDCore do not have
 //        DMA_BIT_MASK().  Remove once support for them has been dropped.
 #ifndef DMA_BIT_MASK
 #define DMA_BIT_MASK(n) (((n) == 64) ? ~0ULL : ((1ULL<<(n))-1))
@@ -83,7 +83,7 @@ MODULE_PARM (tag_q_depth, "i");
 #endif
 MODULE_PARM_DESC (tag_q_depth, "individual tagged command queue depth");
 
-static int max_xfer = 448; // AHCI PRD limit is 224K or 448 sectors 
+static int max_xfer = 448; // AHCI PRD limit is 224K or 448 sectors
 #ifdef module_param_named
 module_param_named(max_xfer, max_xfer, int, 0444);
 #else
@@ -169,7 +169,11 @@ int         rc_ioctl(struct scsi_device * scsi_dev_ptr, int cmd, void *arg);
 void        rc_dump_scp(struct scsi_cmnd * scp);
 const char *rc_info(struct Scsi_Host *host_ptr);
 void        rc_timeout(int to);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 void        rc_timeout_done(unsigned long data);
+#else
+void        rc_timeout_done(struct timer_list * t);
+#endif
 static int  rc_slave_cfg(struct scsi_device *sdev);
 int         rc_bios_params(struct scsi_device *sdev, struct block_device *bdev,
 			   sector_t capacity, int geom[]);
@@ -179,7 +183,7 @@ int         rc_queue_cmd(struct scsi_cmnd * scp, void (*CompletionRoutine) (stru
 #else
 int         rc_queue_cmd_lck(struct scsi_cmnd * scp, void (*CompletionRoutine) (struct scsi_cmnd *));
 #endif
-			 
+
 #ifdef RC_AHCI_SUPPORT
 // Additions for AHCI driver
 static inline void rc_ahci_disable_irq(rc_adapter_t *adapter);
@@ -328,7 +332,7 @@ static Scsi_Host_Template driver_template = {
 	.proc_name =               RC_DRIVER_NAME,
 	.proc_dir =                NULL,
 	.info =                    rc_info,
-	.ioctl =                   rc_ioctl,    
+	.ioctl =                   rc_ioctl,
 	.queuecommand =            rc_queue_cmd,
 	.bios_param =              rc_bios_params,
 	.can_queue =               1,
@@ -358,7 +362,7 @@ rc_init_module(void)
 	extern char       *rc_ident;
 
 	rc_printk(RC_NOTE, "%s %s raid driver version %s build_number %s built "
-		  "%s\n", VER_COMPANYNAME_STR, RC_DRIVER_NAME, 
+		  "%s\n", VER_COMPANYNAME_STR, RC_DRIVER_NAME,
                   RC_DRIVER_VERSION, RC_BUILD_NUMBER, RC_DRIVER_BUILD_DATE);
 	rc_printk(RC_NOTE, "%s %s\n", RC_DRIVER_NAME, rc_ident);
 
@@ -381,7 +385,7 @@ rc_init_module(void)
 	use_swl |= RC_SHWL_TYPE_CARD; // always support cards
 
 	rc_printk(RC_NOTE, "rcraid: cmd_q_depth %d, tag_q_depth %d, max_xfer "
-                  "%d, use_swl 0x%x\n", cmd_q_depth, tag_q_depth, max_xfer, 
+                  "%d, use_swl 0x%x\n", cmd_q_depth, tag_q_depth, max_xfer,
                   use_swl);
 
 	rc_msg_level += debug;
@@ -398,7 +402,7 @@ rc_init_module(void)
 	RC_EnableDIPM = RCRAID_DEFAULT_DIPM;
 	RC_EnableHIPM = RCRAID_DEFAULT_HIPM;
     RC_EnableAN = RCRAID_DEFAULT_AN;
-    RC_EnableNCQ = RCRAID_DEFAULT_NCQ;    
+    RC_EnableNCQ = RCRAID_DEFAULT_NCQ;
     RC_EnableZPODD = RCRAID_DEFAULT_ZPODD;
 
     // Setup ACPI work handler
@@ -829,7 +833,7 @@ rcraid_probe_one(struct pci_dev *dev, const struct pci_device_id *id)
 	if ((adapter_count && rc_adapter_count == rc_state.num_hba) ||
         (rc_adapter_count == 999 && adapter_count == rc_state.num_hba)) {
 		int err;
-        
+
 		err = rc_init_host(dev);
 		if (!err) {
 			if (misc_register(&rccfg_api_dev))
@@ -853,7 +857,7 @@ rc_shutdown_host(struct Scsi_Host *host_ptr)
 {
 	if ((rc_state.state & USE_OSIC) == 0) return;
 
-	
+
 	rc_state.state |= SHUTDOWN;
 
 	rc_printk(RC_DEBUG, "rc_shutdown_host\n" );
@@ -911,7 +915,7 @@ void rc_stop_all_threads(void);
 void rc_start_all_threads(void);
 void rc_msg_suspend_work(rc_adapter_t *adapter);
 void rc_msg_init_tasklets(rc_softstate_t *state);
-void rc_msg_kill_tasklets(rc_softstate_t *state);  
+void rc_msg_kill_tasklets(rc_softstate_t *state);
 void rc_msg_suspend(rc_softstate_t *state, rc_adapter_t* adapter);
 void rc_msg_free_all_dma_memory(rc_adapter_t   *adapter);
 
@@ -925,7 +929,7 @@ void rc_msg_free_all_dma_memory(rc_adapter_t   *adapter);
  */
 static int rcraid_suspend_one(struct pci_dev *pdev, pm_message_t mesg)
 {
-    
+
     rc_softstate_t  *state;
     rc_adapter_t	*adapter;
     int             i;
@@ -939,7 +943,7 @@ static int rcraid_suspend_one(struct pci_dev *pdev, pm_message_t mesg)
     //
     // Looks like a race condition somewhere... this delay
     // seems to solve the issue with suspend/hibernate cycles.
-    // Placement of the delay seems to matter -- after 
+    // Placement of the delay seems to matter -- after
     // scsi_block_requests() doesn't work...
     //
     msleep(rc_suspend_delay);
@@ -972,12 +976,12 @@ static int rcraid_suspend_one(struct pci_dev *pdev, pm_message_t mesg)
     //
 
     state = &rc_state;
-    
+
     rc_printk(RC_NOTE, RC_DRIVER_NAME ": suspend pdev %p\n",
         pdev);
-    
+
     pdev->dev.power.power_state = mesg;
-    
+
     rc_printk(RC_ERROR, "%s: event=%d \n",__FUNCTION__, mesg.event);
 
     //
@@ -1002,7 +1006,7 @@ static int rcraid_suspend_one(struct pci_dev *pdev, pm_message_t mesg)
     for (i = rc_state.num_hba -1; i > 0; i--)
     {
         adapter = rc_dev[i];
-        
+
         pci_save_state(adapter->pdev);
 
         pci_disable_device(adapter->pdev);
@@ -1028,7 +1032,7 @@ static int rcraid_suspend_one(struct pci_dev *pdev, pm_message_t mesg)
 	pci_disable_device(pdev);
 
 	pci_set_power_state(pdev, pci_choose_state(pdev, mesg));
-    
+
     state->adapter_is_suspended |= (1 << adapter->instance);
 
     return 0;
@@ -1073,7 +1077,7 @@ static int rcraid_resume_one(struct pci_dev *pdev)
     // If we made it here then we're the master adapter/controller
     //
 
-    state = &rc_state;    
+    state = &rc_state;
 
     //
     // Bring up the slave controllers first
@@ -1126,7 +1130,7 @@ static int rcraid_resume_one(struct pci_dev *pdev)
     {
 		(*adapter->version->start_func)(adapter);
     }
-    
+
     rc_msg_init_tasklets(state);
 
     rc_start_all_threads();
@@ -1174,7 +1178,7 @@ rcraid_shutdown_one(
 
 #ifdef RC_AHCI_SUPPORT
 #define ICH6_REG_OFFSET_GHC     0x04    // Global HBA Control register
-#define AHCI_GHC_IE             (1 << 1)  // global IRQ enable 
+#define AHCI_GHC_IE             (1 << 1)  // global IRQ enable
 /*
  * disable HW interrupts on all ports on an adapter
  */
@@ -1338,9 +1342,9 @@ int rc_mpt2_init(rc_adapter_t *adapter)
 {
 	rc_mpt2_disable_irq(adapter);
 
-	if (pci_enable_msi(adapter->pdev)) 
+	if (pci_enable_msi(adapter->pdev))
 		rc_printk(RC_WARN, "%s: pci_enable_msi failed\n",__FUNCTION__);
-	else 
+	else
 		adapter->hardware.ismsi = 1;
 
 	return 0;
@@ -1400,7 +1404,7 @@ int rc_queue_cmd_lck (struct scsi_cmnd * scp, void (*CompletionRoutine) (struct 
 
     // If we are suspended(controller is not restarted) block any IO from coming in
     if (  (rc_state.is_suspended == 1) || ( (rc_state.state & SHUTDOWN) == SHUTDOWN) ) {
-        return SCSI_MLQUEUE_DEVICE_BUSY; 
+        return SCSI_MLQUEUE_DEVICE_BUSY;
     }
 
 	return(rc_msg_send_srb(scp));
@@ -1617,7 +1621,7 @@ rc_proc_write_debug(struct file *file, const char __user *buffer,
 static int
 rc_proc_debug_show(struct seq_file *sfile, void *v)
 {
-    seq_printf(sfile, "%d %d %d\n", rc_msg_level, RC_PANIC, RC_TAIL - 1); 
+    seq_printf(sfile, "%d %d %d\n", rc_msg_level, RC_PANIC, RC_TAIL - 1);
     return 0;
 }
 
@@ -1651,7 +1655,7 @@ rc_proc_write_an(struct file *file, const char __user *buffer,
     if (num >= 0 && num < 0xFFFFFFFF)
     {
         rc_send_arg_t   args;
-        
+
         RC_EnableAN = num;
         memset(&args, 0, sizeof(args));
         args.call_type = RC_CTS_CHANGE_PARAM;
@@ -1692,7 +1696,7 @@ rc_proc_write_zpodd(struct file *file, const char __user *buffer,
     if (num >= 0 && num <= 1)
     {
         rc_send_arg_t   args;
-        
+
         RC_EnableZPODD = num;
         memset(&args, 0, sizeof(args));
         args.call_type = RC_CTS_CHANGE_PARAM;
@@ -1777,7 +1781,7 @@ rc_proc_stats_show(struct seq_file *sfile, void *v)
     char *kbuf;
 
     kbuf = kmalloc(8192, GFP_KERNEL);
-    
+
     if (kbuf)
     {
 	    int	ret;
@@ -1829,7 +1833,7 @@ void rc_init_proc(void)
     if (proc_parent == NULL)
     {
         proc_parent = proc_mkdir("scsi/rcraid", NULL);
-    
+
         if (proc_parent)
         {
             const struct rc_proc_entry    *rpe = rc_proc_entries;
@@ -1995,7 +1999,7 @@ static char *info_buffer = NULL;
  *
  * Postconditions
  *  For reads
- *  - if Offset > 0 return next portion of previous built buffer, or 0 if all 
+ *  - if Offset > 0 return next portion of previous built buffer, or 0 if all
  *      of the buffer has been returned
  *  - if Offset == 0 Write data to ProcBuffer and set the Startptr to
  *  beginning of ProcBuffer, return the number of characters written.
@@ -2031,14 +2035,14 @@ rc_proc_info (struct Scsi_Host *shost, char *buf, char **start, off_t offset, in
             kfree(info_buffer);
         }
         info_buffer = NULL;
-        info_buffer_size = 0;    
+        info_buffer_size = 0;
     }
     //End of Request
     else if (offset > info_buffer_size - 1) {
         if (info_buffer != NULL) {
-            kfree(info_buffer);         
+            kfree(info_buffer);
         }
-        info_buffer = NULL; 
+        info_buffer = NULL;
         info_buffer_size = 0;
         return (0);
     }
@@ -2049,7 +2053,7 @@ rc_proc_info (struct Scsi_Host *shost, char *buf, char **start, off_t offset, in
         memcpy(buf, &info_buffer[offset], length);
         return length;
     }
-    
+
     size = 4096;
     info_buffer = kmalloc(size, GFP_KERNEL);
     if (info_buffer == NULL) {
@@ -2057,8 +2061,8 @@ rc_proc_info (struct Scsi_Host *shost, char *buf, char **start, off_t offset, in
             __LINE__);
         return length;
     }
-    
-    //This is the first time being called for a request build the string	
+
+    //This is the first time being called for a request build the string
 	cp = info_buffer;
 	len = 0;
 	cnt = 0;
@@ -2081,14 +2085,14 @@ rc_proc_info (struct Scsi_Host *shost, char *buf, char **start, off_t offset, in
 	len = rc_mop_stats(cp, size - cnt);
 	cnt += len;
 
-    
+
     info_buffer_size = (cnt);
-    
-    //return minimum of actual string size or max buffer length (1024 bytes)    
+
+    //return minimum of actual string size or max buffer length (1024 bytes)
     length = min_t(int, cnt, buf_size);
     memcpy(buf, &info_buffer[0], length);
     *start = buf;
-    
+
 	return (length);
 }
 
@@ -2186,7 +2190,7 @@ rc_proc_read (char *buf,        // read buffer (in kernel space)
 		cnt += len;
 		*start = buf;
 		break;
-        
+
     case RC_PROC_NCQ:
 		*peof = 1;
 		if (offset)
@@ -2197,7 +2201,7 @@ rc_proc_read (char *buf,        // read buffer (in kernel space)
 		cnt += len;
 		*start = buf;
 		break;
-        
+
     case RC_PROC_ZPODD:
         *peof = 1;
         if (offset)
@@ -2312,7 +2316,7 @@ rc_proc_write(struct file *file,    // our file control structure
 		}
 		ret = count;
 		break;
-        
+
     case RC_PROC_NCQ:
 		/* set NCQ */
 		page[count] = '\0';
@@ -2323,7 +2327,7 @@ rc_proc_write(struct file *file,    // our file control structure
 		}
 		ret = count;
 		break;
-        
+
     case RC_PROC_ZPODD:
         /* set ZPODD */
         page[count] = '\0';
@@ -2383,12 +2387,20 @@ rc_printk(int flag, const char *fmt, ...)
 }
 
 void
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 rc_timeout_done(unsigned long data)
+#else
+rc_timeout_done(struct timer_list *t)
+#endif
 {
 	rc_softstate_t *state;
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 	state = (rc_softstate_t *)data;
 	init_timer(&state->rc_timeout);
+#else
+	state = from_timer(state, t, rc_timeout);
+	timer_setup(&state->rc_timeout, rc_timeout_done, 0);
+#endif
 	up(&state->rc_timeout_sema);
 }
 
@@ -2402,10 +2414,15 @@ rc_timeout(int to)
 	 * set up timeout
 	 */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 	init_timer(&state->rc_timeout);
 	state->rc_timeout.expires = jiffies  + to;
 	state->rc_timeout.data = (unsigned long)state;
 	state->rc_timeout.function = rc_timeout_done;
+#else
+	timer_setup(&state->rc_timeout, rc_timeout_done, 0);
+	state->rc_timeout.expires = jiffies + to;
+#endif
 	add_timer(&state->rc_timeout);
 	down(&state->rc_timeout_sema);
 }
@@ -2490,7 +2507,7 @@ rc_dump_scp(struct scsi_cmnd * scp)
 static int rc_notify_reboot(struct notifier_block *this, unsigned long code,
 			    void *x)
 {
-	if ((code == SYS_DOWN) || (code == SYS_HALT) || (code == SYS_POWER_OFF)) 
+	if ((code == SYS_DOWN) || (code == SYS_HALT) || (code == SYS_POWER_OFF))
 		printk(KERN_INFO "%s: stopping all RAIDCore (tm) devices.\n", __FUNCTION__);
 	return NOTIFY_DONE;
 }
@@ -2609,21 +2626,21 @@ static struct ctl_table rcraid_table[] = {
 	  .maxlen	= sizeof(unsigned int),
 	  .mode		= 0644,
 	  .proc_handler	= &proc_dointvec
-	},     
+	},
     {
       .procname = "zpodd",
       .data     = &RC_EnableZPODD,
 	  .maxlen	= sizeof(unsigned int),
 	  .mode		= 0644,
 	  .proc_handler	= &proc_dointvec
-	},     
+	},
     {
       .procname = "suspend_delay",
       .data     = &rc_suspend_delay,
 	  .maxlen	= sizeof(unsigned int),
 	  .mode		= 0644,
 	  .proc_handler	= &proc_dointvec
-	},     
+	},
 	{ }
 };
 

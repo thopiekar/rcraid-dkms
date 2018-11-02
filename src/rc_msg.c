@@ -37,10 +37,18 @@ void rc_msg_check_int_tasklet(unsigned long arg);
 
 void rc_msg_send_srb_function (rc_softstate_t *state, int function_code);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 void rc_msg_timer(unsigned long data);
+#else
+void rc_msg_timer(struct timer_list * t);
+#endif
 
 void rc_msg_timeout(int to);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 void rc_msg_timeout_done(unsigned long data);
+#else
+void rc_msg_timeout_done(struct timer_list * t);
+#endif
 
 void rc_msg_isr(rc_adapter_t *adapter);
 void rc_msg_schedule_dpc(void);
@@ -62,7 +70,7 @@ int  rc_msg_stats(char *buf, int buf_size);
 int  rc_mop_stats(char *buf, int buf_size);
 void rc_wakeup_all_threads(void);
 
-void 
+void
 rc_add_dmaMemoryList(void *cpu_addr, dma_addr_t* dmaHandle, rc_uint32_t bytes,
 			rc_adapter_t *adapter);
 
@@ -251,7 +259,7 @@ rc_setup_communications(void)
 void
 rc_check_interrupt(rc_adapter_t* adapter)
 {
-    
+
 	preempt_disable();
     rc_interface_header->check_interrupt_arg = adapter->private_mem.vaddr;
 
@@ -317,11 +325,11 @@ void rc_msg_suspend(rc_softstate_t *state, rc_adapter_t* adapter)
 {
     rc_send_arg_t   args;
     int             i;
-    
+
     rc_printk(RC_NOTE, "%s\n",__FUNCTION__);
-    
+
     state->is_suspended = 1;
-    
+
     // flush the logical disk cache
     rc_printk(RC_ALERT, "rc_msg_suspend: flushing cache\n");
 	rc_msg_send_srb_function(state, RC_SRB_FLUSH);
@@ -337,7 +345,7 @@ void rc_msg_suspend(rc_softstate_t *state, rc_adapter_t* adapter)
 	}
     rc_printk(RC_ALERT, "rc_msg_suspend: pausing for 1/4 second\n");
     rc_msg_timeout(HZ>>2);
-    
+
     // make sure all IOs are completed
 	spin_lock(&state->osic_lock);
 	check_lock(state);
@@ -357,7 +365,7 @@ void rc_msg_suspend(rc_softstate_t *state, rc_adapter_t* adapter)
     }
     state->osic_locked = 0;
 	spin_unlock(&state->osic_lock);
-    
+
     for (i = state->num_hba - 1; i >= 0; i--)
     {
         rc_msg_free_all_dma_memory(rc_dev[i]);
@@ -375,16 +383,16 @@ void rc_msg_suspend(rc_softstate_t *state, rc_adapter_t* adapter)
  *        None
  *
  */
-void rc_msg_resume(rc_softstate_t *state, rc_adapter_t* adapter) 
+void rc_msg_resume(rc_softstate_t *state, rc_adapter_t* adapter)
 {
     rc_send_arg_t   args;
     int             i;
 
-    rc_printk(RC_NOTE, "%s\n",__FUNCTION__);       
-    
+    rc_printk(RC_NOTE, "%s\n",__FUNCTION__);
+
     // don't lock, holding a spinlock while restarting the controller makes linux unhappy
     // since the timer and interrupts are disable this should be fine
-           
+
     for (i = state->num_hba - 1; i >= 0; i--)
     {
         if (rc_dev[i]->private_mem.vaddr) {
@@ -396,13 +404,13 @@ void rc_msg_resume(rc_softstate_t *state, rc_adapter_t* adapter)
             rc_printk(RC_ERROR, "%s: no adapter memory :( \n",__FUNCTION__);
         }
     }
-    
+
 	if ((state->state & ENABLE_TIMER) != ENABLE_TIMER)
 	{
     	state->state |= ENABLE_TIMER;
 		add_timer(&state->timer);
 	}
-   
+
     if (state->is_suspended)
     {
         rc_msg_send_srb_function(state, RC_SRB_RESTART);
@@ -534,9 +542,9 @@ int rc_wq_handler(void *work)
 	    {
 	        //set_current_state(TASK_RUNNING);
 	        rc_work = (rc_work_t *) acpi_work_item_head;
-	
+
 	        args = (struct rc_receive_arg_s *) rc_work->args;
-	
+
 	        switch (rc_work->call_type)
 	        {
 	        case RC_ACPI_INVOKE:
@@ -549,7 +557,7 @@ int rc_wq_handler(void *work)
                     // Somewhere after 3.2.0, ACPI no longer enables GPE's if the device
                     // is WAKE capable. Instead, ACPI relies on the power management system
                     // to handle this. Since power management more or less requires the module
-                    // to have a GPL license to call many of the required APIs, we need to 
+                    // to have a GPL license to call many of the required APIs, we need to
                     // deal with the GPE clear/enable here...
                     //
                     // Check if we're trying to turn off the power. If so, handle the GPE.
@@ -577,7 +585,7 @@ int rc_wq_handler(void *work)
 	            } else {
 	                union acpi_object *out_object;
 	                struct acpi_buffer outBuf = { ACPI_ALLOCATE_BUFFER, NULL };
-	
+
 	                if (args->u.acpi.inPtr)
 	                {
 	                    if (args->u.acpi.outPtr) {
@@ -621,14 +629,14 @@ int rc_wq_handler(void *work)
 	            //  to have the callback executed. Falling through allows that.
 	            ;
 	        }
-	
+
 	        if (args->u.acpi.callback)
 	        {
 	            (*args->u.acpi.callback)(rc_work->args);
 	        }
-	
+
 	        kfree((void *) rc_work->method);
-	
+
 	        spin_lock(&acpi_work_item_lock);
 	        if (acpi_work_item_head == acpi_work_item_tail)
 	        {
@@ -637,7 +645,7 @@ int rc_wq_handler(void *work)
 	            acpi_work_item_head = acpi_work_item_head->next;
 	        }
 	        spin_unlock(&acpi_work_item_lock);
-	
+
 	        kfree((void *) rc_work);        // Make sure this is rc_work as kthread passes NULL for parameter work!
 	    }
 
@@ -702,10 +710,10 @@ rc_receive_msg(void)
 	case RC_CTR_MAP_MEMORY:
 		rc_msg_map_mem(&args->u.map_memory);
 		break;
-    
+
     case RC_CTR_GET_DMA_ADDRESS:
         rc_msg_get_dma_memory(&args->u.get_dma_memory);
-        break;    
+        break;
 
 	case RC_CTR_UNMAP_MEMORY:
 		rc_msg_unmap_mem(&args->u.unmap_memory);
@@ -714,11 +722,11 @@ rc_receive_msg(void)
 	case RC_CTR_PRINT_VA:
 		rc_vprintf(args->u.print_va.severity, args->u.print_va.format, args->u.print_va.va_l);
 		break;
-    
+
     case RC_CTR_SCHEDULE_DPC:
         rc_msg_schedule_dpc();
-        break;    
-    
+        break;
+
 	case RC_CTR_WAIT_MICROSECONDS:
 		delay = args->u.wait_microseconds.microseconds;
 		//        rc_printk(RC_DEBUG2, "delay %d microseconds\n", delay);
@@ -780,11 +788,11 @@ rc_receive_msg(void)
 	case RC_CTR_MEMORY_OP:
 		rc_msg_mem_op(args->u.mem_op);
 		break;
-        
+
     case RC_CTR_ACCESS_OK:
         rc_msg_access_ok(args->u.isAccessOk);
         break;
-                       
+
 	case RC_PCI_READ_CONFIG_BYTE:
 	case RC_PCI_READ_CONFIG_DWORD:
 	case RC_PCI_WRITE_CONFIG_BYTE:
@@ -891,13 +899,13 @@ void rc_msg_resume_work(void)
 {
     rc_adapter_t* adapter;
     adapter = rc_dev[0];
-    rc_printk(RC_ERROR, "%s: schedule resume tasklet\n",__FUNCTION__);    
+    rc_printk(RC_ERROR, "%s: schedule resume tasklet\n",__FUNCTION__);
     rc_msg_resume(&rc_state, adapter);
 }
 
 void rc_msg_suspend_work(rc_adapter_t *adapter)
 {
-    rc_printk(RC_ERROR, "%s: schedule suspend tasklet\n",__FUNCTION__);    
+    rc_printk(RC_ERROR, "%s: schedule suspend tasklet\n",__FUNCTION__);
     rc_msg_suspend(&rc_state, adapter);
 }
 
@@ -945,7 +953,7 @@ rc_msg_init(rc_softstate_t *state)
 	 * setup lock and counter for processing pending interrupts
 	 */
 	atomic_set(&state->intr_pending, 0);
-    
+
 	/*
 	 * setup tasklet for srb q processing;
 	 */
@@ -953,9 +961,9 @@ rc_msg_init(rc_softstate_t *state)
 	state->srb_q.head = (rc_srb_t *)0;
 	state->srb_q.tail = (rc_srb_t *)0;
     spin_lock_init(&state->srb_q.lock);
-        
+
     INIT_DELAYED_WORK(&state->resume_work, (void *) rc_msg_resume_work);
-    
+
     /*
 	 * setup tasklet for srb done processing;
 	 */
@@ -1065,7 +1073,7 @@ rc_msg_init(rc_softstate_t *state)
 	if (SmartPollInterval != SMART_POLL_INTERVAL_DEFAULT)
 		rc_printk(RC_INFO, "rcraid: set parameter SmartPollInterval = %d "
 			  "seconds\n", SmartPollInterval);
-              
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31)
     args.u.get_info.support4kNativeDisks = 0;
 #else
@@ -1214,24 +1222,29 @@ rc_msg_init(rc_softstate_t *state)
 	state->osic_locked = 0;
 //   spin_unlock(&state->osic_lock);
 
-    
-    
-	state->state |= PROCESS_INTR;   
+
+
+	state->state |= PROCESS_INTR;
     // we are ready to process interrupts
     // check all adapters to see if any are outstanding
-    for (i=0; i < rc_state.num_hba; i++) {   
+    for (i=0; i < rc_state.num_hba; i++) {
         rc_msg_isr(rc_dev[i]);
     }
 
 	/*
 	 * intialize the periodic timer for the OSIC
-	 */          
+	 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 	init_timer(&state->timer);
 	state->timer.expires = jiffies  + state->timer_interval ;
 	state->timer.data = (unsigned long)state;
 	state->timer.function = rc_msg_timer;
+#else
+	timer_setup(&state->timer, rc_msg_timer, 0);
+	state->timer.expires = jiffies + state->timer_interval;
+#endif
 	state->state |= ENABLE_TIMER;
- 
+
 	add_timer(&state->timer);
 
     rc_printk(RC_INFO2,"rc_msg_init: timer started.... wait for callback \n");
@@ -1257,13 +1270,20 @@ rc_msg_init(rc_softstate_t *state)
 	return(0);
 }
 void
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 rc_msg_timer(unsigned long data)
+#else
+rc_msg_timer(struct timer_list * t)
+#endif
 {
 	rc_softstate_t *state;
 	rc_send_arg_t    args;
 
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 	state = (rc_softstate_t *)data;
+#else
+	state = from_timer(state, t, timer);
+#endif
 
 	if ((state->state & ENABLE_TIMER) == 0)
 		return;
@@ -1271,10 +1291,15 @@ rc_msg_timer(unsigned long data)
 	/*
 	 * set up timeout
 	 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 	init_timer(&state->timer);
 	state->timer.expires = jiffies  + state->timer_interval;
 	state->timer.data = (unsigned long)state;
 	state->timer.function = rc_msg_timer;
+#else
+	timer_setup(&state->timer, rc_msg_timer,0);
+	state->timer.expires = jiffies + state->timer_interval;
+#endif
 	add_timer(&state->timer);
 
 	spin_lock(&state->osic_lock);
@@ -1297,19 +1322,19 @@ rc_msg_isr( rc_adapter_t *adapter)
 
 	rc_softstate_t *state;
 	state = &rc_state;
-   
+
     // Do not process any interrupts until PROCESS_INTR flag is set
     // indicating the bottom driver is ready
     // rc_msg_init will check all adapters for interrupts at that time
 
 
     if ( (state->state & PROCESS_INTR) != 0) {
-        atomic_inc(&adapter->checkInterrupt); 
+        atomic_inc(&adapter->checkInterrupt);
         tasklet_schedule(&state->intr_tasklet);
     }
 
-    
-    
+
+
 }
 
 
@@ -1319,8 +1344,8 @@ void rc_msg_check_int_tasklet(unsigned long arg)
     rc_adapter_t* adapter;
     int i;
     state = (rc_softstate_t *)arg;
-    
-    
+
+
 
 
     if ( (state->state & PROCESS_INTR) != 0) {
@@ -1350,8 +1375,8 @@ rc_msg_schedule_dpc()
 {
     rc_softstate_t *state;
     state = &rc_state;
-    
-    
+
+
     if (atomic_read(&state->intr_pending) < 20) {
         atomic_inc(&state->intr_pending);
 
@@ -1618,8 +1643,8 @@ rc_msg_srb_q_tasklet(  unsigned long arg)
 	do {
 		/*
 		 * Process any pending interrupts
-		 */         
-         
+		 */
+
 		progress = 0;
 		stat_last_pending = 0;
 		stat_intr_low = 0;
@@ -1715,8 +1740,8 @@ rc_msg_srb_q_tasklet(  unsigned long arg)
 			stat_intr_hi -= stat_intr_low;
 			if (sp->max_intr_delay < stat_intr_hi)
 				sp->max_intr_delay = stat_intr_hi;
-		}                           
-        
+		}
+
         spin_unlock_irqrestore(&state->srb_q.lock, irql);
 
 	} while (progress);
@@ -1748,7 +1773,7 @@ rc_msg_srb_done_tasklet(  unsigned long arg)
 	}
 
 	spin_unlock_irqrestore(&state->srb_done.lock, irql);
-    
+
 }
 
 void
@@ -1861,7 +1886,7 @@ rc_msg_srb_complete(struct rc_srb_s *srb)
 		kfree(srb);
 		return;
 	}
-    
+
 	/*
 	 * Something went wrong.  May need to check specific error codes
 	 */
@@ -1896,7 +1921,7 @@ rc_msg_srb_complete(struct rc_srb_s *srb)
 	PUT_IO_REQUEST_LOCK_IRQRESTORE(irql);
 	srb->seq_num = -1;
 	kfree(srb);
-    
+
 }
 
 /*
@@ -2114,29 +2139,29 @@ rc_msg_map_phys_to_virt(struct map_memory_s *map)
 }
 
 
-void 
+void
 rc_add_dmaMemoryList(void *cpu_addr, dma_addr_t* dmaHandle, rc_uint32_t bytes,
 			rc_adapter_t *adapter)
 {
     struct DmaMemoryNode *newNode;
-    
+
     //newNode = vmalloc(sizeof(struct DmaMemoryNode));
     newNode = kmalloc(sizeof(struct DmaMemoryNode), GFP_KERNEL);
-    
+
     if (newNode)
     {
         newNode->cpu_addr = cpu_addr;
         newNode->dmaHandle = *dmaHandle;
         newNode->bytes = bytes;
         newNode->nextNode = NULL;
-    
+
         if(adapter->dmaMemoryListHead) {
             adapter->dmaMemoryListTail->nextNode = newNode;
         }
         else {
             adapter->dmaMemoryListHead = newNode;
         }
-        adapter->dmaMemoryListTail = newNode;        
+        adapter->dmaMemoryListTail = newNode;
     }
 
 }
@@ -2147,7 +2172,7 @@ rc_msg_get_dma_memory(alloc_dma_address_t *dma_address)
 {
     dma_addr_t* 	    dmaHandle;
     rc_adapter_t	    *adapter;
-    
+
     adapter = (rc_adapter_t *) dma_address->dev_handle;
     dmaHandle = (dma_addr_t*) &dma_address->dmaHandle;
 
@@ -2166,11 +2191,11 @@ rc_msg_free_dma_memory(rc_adapter_t	*adapter, void *cpu_addr, dma_addr_t dmaHand
     pci_free_consistent(adapter->pdev, bytes, cpu_addr, dmaHandle);
 }
 
-void 
+void
 rc_msg_free_all_dma_memory(rc_adapter_t	*adapter)
 {
 
-    struct DmaMemoryNode *dmaNode;    
+    struct DmaMemoryNode *dmaNode;
 
     dmaNode = adapter->dmaMemoryListHead;
 
@@ -2181,12 +2206,12 @@ rc_msg_free_all_dma_memory(rc_adapter_t	*adapter)
 		dmaNode->dmaHandle,
 		dmaNode->bytes
 		);
-    
-        adapter->dmaMemoryListHead = adapter->dmaMemoryListHead->nextNode;    
+
+        adapter->dmaMemoryListHead = adapter->dmaMemoryListHead->nextNode;
         kfree(dmaNode);
         dmaNode = adapter->dmaMemoryListHead;
     }
-    
+
     if (adapter->dmaMemoryListHead == NULL)
     {
 	    //adapter->dmaMemoryListTail = NULL;
@@ -2250,8 +2275,8 @@ rc_msg_map_mem(struct map_memory_s *map)
 			offset = (unsigned long)vaddr & (PAGE_SIZE-1);
 			len_mapped = PAGE_SIZE - offset;
 			if (len < len_mapped)
-				len_mapped = len;    
-                
+				len_mapped = len;
+
 			map->physical_address = dma_map_page(&adapter->pdev->dev, page, offset, len_mapped, PCI_DMA_BIDIRECTIONAL);
             if (dma_mapping_error(&adapter->pdev->dev, map->physical_address))
             {
@@ -2262,8 +2287,8 @@ rc_msg_map_mem(struct map_memory_s *map)
 		}
     } else if ((map->memory_id & MEM_TYPE) == RC_MEM_DMA) {
         vaddr = (void *)(rc_uint_ptr_t)map->address;
-        
-        map->physical_address = dma_map_single(&adapter->pdev->dev, vaddr, map->number_bytes, PCI_DMA_BIDIRECTIONAL); 
+
+        map->physical_address = dma_map_single(&adapter->pdev->dev, vaddr, map->number_bytes, PCI_DMA_BIDIRECTIONAL);
         if (dma_mapping_error(&adapter->pdev->dev, map->physical_address))
         {
             map->number_bytes = 0;
@@ -2342,12 +2367,21 @@ rc_msg_unmap_mem(struct unmap_memory_s *unmap)
 
 
 void
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 rc_msg_timeout_done(unsigned long data)
+#else
+rc_msg_timeout_done(struct timer_list * t)
+#endif
 {
 	rc_softstate_t *state;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 	state = (rc_softstate_t *)data;
 	init_timer(&state->msg_timeout);
+#else
+	state = from_timer(state, t, msg_timeout);
+	timer_setup(&state->msg_timeout, rc_msg_timeout_done, 0);
+#endif
 	up(&state->msg_timeout_sema);
 }
 
@@ -2361,20 +2395,25 @@ rc_msg_timeout( int to)
 	 * set up timeout
 	 */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 	init_timer(&state->msg_timeout);
 	state->msg_timeout.expires = jiffies  + to;
 	state->msg_timeout.data = (unsigned long)state;
 	state->msg_timeout.function = rc_msg_timeout_done;
+#else
+	timer_setup(&state->msg_timeout, rc_msg_timeout_done, 0);
+	state->msg_timeout.expires = jiffies  + to;
+#endif
 	add_timer(&state->msg_timeout);
 	down(&state->msg_timeout_sema);
 
 }
 
-void 
+void
 rc_msg_access_ok(rc_access_ok_t accessOk)
 {
 
-    accessOk.returnStatus = access_ok( VERIFY_WRITE , accessOk.access_location, accessOk.access_size);        
+    accessOk.returnStatus = access_ok( VERIFY_WRITE , accessOk.access_location, accessOk.access_size);
 }
 
 
@@ -2553,7 +2592,7 @@ rc_acpi_evaluate_object(acpi_handle handle, char *method, void *ret, int *size)
 
     if (!handle || method == NULL || ret == NULL)
         return AE_BAD_PARAMETER;
-    
+
     memset(&buffer, 0, sizeof(buffer));
     buffer.length = ACPI_ALLOCATE_BUFFER;
 
@@ -2600,4 +2639,3 @@ rc_acpi_evaluate_object(acpi_handle handle, char *method, void *ret, int *size)
 
     return ac_stat;
 }
-

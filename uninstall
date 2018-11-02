@@ -1,13 +1,13 @@
 #!/bin/sh
 #
 #  Script to uninstall the RAIDCore drivers from the SDK for supported platforms
-#  (RedHat and SuSE). 
+#  (RedHat and SuSE).
 #
 # Copyright © 2006-2008 Ciprico Inc. All rights reserved.
 # Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
 #
 # Use of this software is subject to the terms and conditions of the written
-# software license agreement between you and DHS (the "License"),  
+# software license agreement between you and DHS (the "License"),
 # including, without limitation, the following (as further elaborated in the
 # License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND DHS DISCLAIMS
 # ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
@@ -26,12 +26,11 @@ if [ $UID != 0 ] ; then
 fi
 
 if [ -e /etc/redhat-release ]; then
-	(cd src; sh ./uninstall_rh);	
+	(cd src; sh ./uninstall_rh);
 elif [ -e /etc/SuSE-release ]; then
-	(cd src; sh ./uninstall_suse);	
+	(cd src; sh ./uninstall_suse);
 else
 	KVERS=`uname -r`
 	rm -f /lib/modules/$(KVERS)/kernel/drivers/scsi/rcraid.ko
 	exit
 fi
-

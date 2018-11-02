@@ -7,7 +7,7 @@
 # Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
 #
 # Use of this software is subject to the terms and conditions of the written
-# software license agreement between you and DHS (the "License"),  
+# software license agreement between you and DHS (the "License"),
 # including, without limitation, the following (as further elaborated in the
 # License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND DHS DISCLAIMS
 # ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
@@ -21,8 +21,8 @@
 #
 #
 #  Script to uninstall the driver from the /lib/modules tree. By default
-#  drivers for all installed variations of the currently running kernel 
-#  will be uninstalled. 
+#  drivers for all installed variations of the currently running kernel
+#  will be uninstalled.
 #
 
 drv_basename=rcraid
@@ -30,7 +30,7 @@ kernel=
 flavors=
 
 source ./common_shell
- 
+
 if [ $UID != 0 ] ; then
     echo "This script must be run as root"
     exit 1
@@ -94,7 +94,7 @@ if [ -z $flavors ] ; then
 
     for i in $installed ; do
          flavors="$flavors `echo $i | sed -e s/$base//`"
-    done 
+    done
 fi
 
 # Fixups for the 2.6 kernel
@@ -154,7 +154,7 @@ for flavor in $flavors ; do
 	    echo Making initrd $initrd
 	    /sbin/mkinitrd -f $initrd.new $version
 	    if [ $? -ne 0 ] ; then
-		echo Failed to make $initrd 
+		echo Failed to make $initrd
 		failed=`expr $failed - 1`
 		failed_version+=version
 		continue

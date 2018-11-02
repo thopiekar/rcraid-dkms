@@ -39,8 +39,8 @@ extern void rc_msg_process_srb(rc_srb_t *);
 
 struct semaphore rccfg_wait;
 
-static void 
-rccfg_callback (rc_srb_t *srb) 
+static void
+rccfg_callback (rc_srb_t *srb)
 {
 	up(&rccfg_wait);
 }
@@ -154,19 +154,19 @@ rccfg_io(struct sg_io_hdr *hdr)
 		state->srb_q.tail = srb;
 	}
 	spin_unlock_irqrestore(&state->srb_q.lock, irql);
-    
+
 	state->stats.scb_total++;
 	state->stats.target_total[target]++;
 
 	atomic_inc(&state->stats.scb_pending);
 	atomic_inc(&state->stats.target_pending[target]);
-    
+
 	tasklet_schedule(&state->srb_q.tasklet);
 
         // wait for callback completion
 	down(&rccfg_wait);
 
-	/* copy the srb status back into the sg hdr status 
+	/* copy the srb status back into the sg hdr status
 	 * this is appear to all that the user space uses
 	 * for error reporting, but it might need sense data
 	 * at some point
