@@ -16,6 +16,7 @@ Therefore we try here to keep the code alive for many kernel versions as possibl
     ```bash
     sudo add-apt-repository ppa:thopiekar/rcraid
     sudo apt-get update
+    sudo apt-get install rcraid-dkms
     ```
 
 * Thanks go to..
