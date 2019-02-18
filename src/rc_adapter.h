@@ -40,7 +40,9 @@ typedef int (* rc_adapter_func_t)(struct rc_adapter_s *adapter);
 #define MAX_HBA             8
 #define MAX_TOTAL_PORTS     (MAX_HBA * MAX_PORTS_PER_HA)
 #define MAX_ARRAY           32
+#ifndef SECTOR_SIZE
 #define SECTOR_SIZE         512
+#endif
 
 #define PCI_CFG_SIZE    256
 typedef struct rc_hw_info {
