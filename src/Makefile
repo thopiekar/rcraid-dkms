@@ -89,7 +89,7 @@ ibanner:
 
 obj-m := rcraid.o
 
-rcraid-objs := rc_init.o rc_msg.o rc_mem_ops.o rc_event.o rc_config.o rcblob.${PLATFORM} \
+rcraid-objs := rc_init.o rc_msg.o rc_mem_ops.o rc_event.o rc_config.o rcblob.${PLATFORM}.o \
 	       vers.o
 
 .PHONY:	$(obj)/vers.c
@@ -98,6 +98,7 @@ $(obj)/vers.c:
 
 # hack to avoid warning about missing .rcblob.cmd file when modpost tries to
 # find all the sources
-.PHONY: $(obj)/rcblob.${PLATFORM}
-$(obj)/rcblob.${PLATFORM}:
+.PHONY: $(obj)/rcblob.${PLATFORM}.o
+$(obj)/rcblob.${PLATFORM}.o:
+	ln -sf `basename $@ .o` $@
 	@( echo "cmd_$@ := true"; echo "dep_$@ := \\"; echo "	$@ \\"; echo "" ) > $(obj)/.`basename $@`.cmd
