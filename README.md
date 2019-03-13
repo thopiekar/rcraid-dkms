@@ -22,6 +22,13 @@ Installation
     sudo apt-get update
     sudo apt-get install rcraid-dkms
     ```
+  * Switching to RAID mode:
+    * Boot Linux in AHCI mode.
+    * Append `modprobe.blacklist=ahci` to GRUB_CMDLINE_LINUX_DEFAULT in /etc/default/grub
+    * Run `sudo update-grub`
+    * Restart
+    * Switch to RAID mode
+    * Boot your Linux installation from a RAID disk
 
 Thanks go to..
 ==============
