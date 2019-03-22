@@ -209,13 +209,22 @@ int32_t
 rc_vprintf(uint32_t severity, const char *format, va_list ar)
 {
 	struct timeval tv;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
+	struct timespec ts;
+#endif
         static int rc_saw_newline=1;
 
 	if (severity > rc_msg_level)
 		return 0;
 
         if (severity && rc_saw_newline) {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
+		getnstimeofday(&ts);
+		tv.tv_sec = ts.tv_sec;
+		tv.tv_usec = ts.tv_nsec / 1000;
+#else
 		do_gettimeofday(&tv);
+#endif
 		printk("rcraid: (%li.%06li) ", tv.tv_sec, tv.tv_usec);
 	}
 
@@ -2413,7 +2422,12 @@ void
 rc_msg_access_ok(rc_access_ok_t accessOk)
 {
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
+    accessOk.returnStatus = access_ok( accessOk.access_location, accessOk.access_size);
+#else
     accessOk.returnStatus = access_ok( VERIFY_WRITE , accessOk.access_location, accessOk.access_size);
+#endif /* LINUX_VERSION_CODE */
+	
 }
 
 
