@@ -346,7 +346,9 @@ static Scsi_Host_Template driver_template = {
 #if LINUX_VERSION_CODE == KERNEL_VERSION(2,6,24)
 	.use_sg_chaining =         ENABLE_SG_CHAINING,
 #endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
 	.use_clustering =          ENABLE_CLUSTERING,
+#endif
 	.slave_configure =         rc_slave_cfg,
 };
 
