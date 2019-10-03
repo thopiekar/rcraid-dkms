@@ -1973,7 +1973,7 @@ rc_slave_cfg(struct scsi_device *sdev)
 }
 
 int
-#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 3, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,3,0)
 rc_ioctl (struct scsi_device * scsi_dev_ptr, unsigned int cmd, void *arg)
 #else
 rc_ioctl (struct scsi_device * scsi_dev_ptr, int cmd, void *arg)
