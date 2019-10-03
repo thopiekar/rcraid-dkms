@@ -165,7 +165,11 @@ static int  rc_eh_bus_reset(struct scsi_cmnd * scmd);
 static int  rc_eh_hba_reset(struct scsi_cmnd * scmd);
 
 void        rc_shutdown_adapter(rc_adapter_t *adapter);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,3,0)
+int         rc_ioctl(struct scsi_device * scsi_dev_ptr, unsigned int cmd, void *arg);
+#else
 int         rc_ioctl(struct scsi_device * scsi_dev_ptr, int cmd, void *arg);
+#endif
 void        rc_dump_scp(struct scsi_cmnd * scp);
 const char *rc_info(struct Scsi_Host *host_ptr);
 void        rc_timeout(int to);
@@ -1969,9 +1973,11 @@ rc_slave_cfg(struct scsi_device *sdev)
 }
 
 int
-rc_ioctl (struct scsi_device * scsi_dev_ptr,
-	  int cmd,
-	  void *arg)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 3, 0)
+rc_ioctl (struct scsi_device * scsi_dev_ptr, unsigned int cmd, void *arg)
+#else
+rc_ioctl (struct scsi_device * scsi_dev_ptr, int cmd, void *arg)
+#endif
 {
 	char direction = 'w';
 
