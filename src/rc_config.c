@@ -96,9 +96,11 @@ rccfg_io(struct sg_io_hdr *hdr)
 	switch (hdr->dxfer_direction) {
 	case SG_DXFER_TO_DEV:
 		srb->flags    = RC_SRB_FLAGS_DATA_IN;
+		break;
 	case SG_DXFER_TO_FROM_DEV:
 	case SG_DXFER_FROM_DEV:
 		srb->flags    = RC_SRB_FLAGS_DATA_OUT;
+		break;
 	}
 
 	if(!(srb->cdb = kmalloc(hdr->cmd_len, GFP_NOWAIT)) ) {
