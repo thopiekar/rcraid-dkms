@@ -4,7 +4,7 @@ AMD RAIDXpert driver as DKMS package
 Foreword:
 ===========
 
-Many AMD mainboards for the AM4 socket based on the X370 and X470 come with RAID support.
+Many AMD mainboards for the AM4 socket based on the X370, X470 and X570 come with RAID support.
 But this RAID mode, which needs to be set in the BIOS, requires a specific driver for each OS.
 There is a driver for Windows, but for Linux AMD provides either a binary blob or the sources.
 When following the instructions, you will need to recompile the driver and install the kernel module on each kernel update and/or upgrade.
