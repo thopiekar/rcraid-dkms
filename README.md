@@ -34,6 +34,10 @@ Installation
     * Restart
     * Switch to RAID mode
     * Boot your Linux installation from a RAID disk
+    
+Further info
+============
+  * https://thopiekar.eu/other/amd-raidxpress/
 
 Thanks go to..
 ==============
