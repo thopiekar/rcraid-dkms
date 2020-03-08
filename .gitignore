@@ -1,3 +1,15 @@
 # Results of a build inside the source dir
 src/built-in.a
 src/rcraid.mod
+src/*.a.cmd
+src/*.o.cmd
+src/*.o
+src/.rcraid.ko.cmd
+src/.rcraid.mod.cmd
+src/Module.symvers
+src/modules.order
+src/rcraid.ko
+
+# Generated files
+src/rcraid.mod.c
+src/vers.c
