@@ -20,7 +20,7 @@ RC_HOST=$(shell /bin/hostname)
 RC_USER=$(shell whoami)
 RC_DATE=$(shell /bin/date)
 RC_BUILD_DATE=$(shell /bin/date +'%b %d %Y')
-PLATFORM=$(shell uname -i)
+PLATFORM=$(shell uname -m)
 
 EXTRA_CFLAGS += -D__LINUX__
 EXTRA_CFLAGS += -DRC_AHCI_SUPPORT -DRC_AMD_AHCI -DRC_AHCI_AUTOSENSE
