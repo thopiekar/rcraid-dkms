@@ -38,58 +38,62 @@ EXTRA_CFLAGS += -DRC_DRIVER_BUILD_DATE='"${RC_BUILD_DATE}"'
 #            make KVERS=2.6.18-1.25-smp
 
 ifndef KVERS
-KVERS=$(shell uname -r)
+	KVERS=$(shell uname -r)
 endif
 
 # either set path to the kernel build tree here or pass in the directory
 ifndef KDIR
-KDIR    := /lib/modules/$(KVERS)/build
+	KDIR    := /lib/modules/$(KVERS)/build
 endif
 
 ifdef KBUILD_SRC
-ifneq ($(shell grep --quiet "irq_handler_t" $(srctree)/include/linux/interrupt.h && echo yes), yes)
-EXTRA_CFLAGS += -DNO_IRQ_HANDLER_T
+	ifneq ($(shell grep --quiet "irq_handler_t" $(srctree)/include/linux/interrupt.h && echo yes), yes)
+		EXTRA_CFLAGS += -DNO_IRQ_HANDLER_T
+	endif
 endif
+
+ifneq ($(RUN_DEPMOD),)
+	DEPMOD := /sbin/depmod -a
+else
+	DEPMOD := true
 endif
 
 PWD    := $(shell pwd)
 
-.PHONY: install bbanner ibanner
+.PHONY: install
 
-all: bbanner
-	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
+all: module
+	$(MAKE) -C $(KDIR) M=$(PWD)
+
+module:
+	$(MAKE) -C $(KDIR) M=$(PWD)
 
 clean:
-	@rm -f *.o *.ko vers.c .*.cmd .*.d
-	@rm -f rcraid.mod.c Module.symvers Modules.symvers
-	@rm -rf .tmp_versions Module.markers modules.order
+	$(RM) -f *.o *.ko vers.c .*.cmd .*.d
+	$(RM) -f rcraid.mod.c Module.symvers Modules.symvers
+	$(RM) -rf .tmp_versions Module.markers modules.order
 
-install: ibanner
-	@if [ -e /etc/redhat-release ]; then                             \
-	     echo "performing Redhat install";                           \
-	     (sh ./install_rh $(KVERS));                                 \
-	 elif [ -e /etc/SuSE-release ]; then                             \
-	     echo "performing SuSE install";                             \
-	     (sh ./install_suse $(KVERS));                               \
-	 else                                                            \
-	     echo "performing generic install";                          \
-	     cp rcraid.ko /lib/modules/$(KVERS)/kernel/drivers/scsi;     \
-	     depmod -a                                                   \
-	 fi
-
-bbanner:
-	@echo ------------------------------------------------------------
-	@echo - building for kernel $(KVERS)
-	@echo ------------------------------------------------------------
-
-ibanner:
-	@echo ------------------------------------------------------------
-	@echo - installing for kernel $(KVERS)
-	@echo ------------------------------------------------------------
+install:
+	@if [ -e /etc/redhat-release ]; then                            \
+	    echo "performing Redhat install";                           \
+	    (sh ./install_rh $(KVERS));                                 \
+	elif [ -e /etc/SuSE-release ]; then                             \
+	    echo "performing SuSE install";                             \
+	    (sh ./install_suse $(KVERS));                               \
+	else                                                            \
+	    echo "performing generic install";                          \
+	    cp rcraid.ko /lib/modules/$(KVERS)/kernel/drivers/scsi;     \
+	    $(DEPMOD) -a                                                \
+	fi
 
 obj-m := rcraid.o
 
-rcraid-objs := rc_init.o rc_msg.o rc_mem_ops.o rc_event.o rc_config.o rcblob.${PLATFORM}.o \
+rcraid-objs := rc_init.o \
+               rc_msg.o \
+               rc_mem_ops.o \
+               rc_event.o \
+               rc_config.o \
+               rcblob.${PLATFORM}.o \
 	       vers.o
 
 .PHONY:	$(obj)/vers.c
