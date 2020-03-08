@@ -2427,7 +2427,7 @@ rc_msg_access_ok(rc_access_ok_t accessOk)
 #else
     accessOk.returnStatus = access_ok( VERIFY_WRITE , accessOk.access_location, accessOk.access_size);
 #endif /* LINUX_VERSION_CODE */
-	
+
 }
 
 

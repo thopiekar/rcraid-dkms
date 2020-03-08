@@ -10,7 +10,7 @@
 *   Copyright (c) 2008-2014, Dot Hill Systems Corp.  All rights reserved.
 *   Copyright (c) 2015 Seagate All rights reserved.
 *
-\****************************************************************************/ 
+\****************************************************************************/
 
 
 #ifndef _RC_VERSION_H
