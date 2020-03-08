@@ -63,7 +63,6 @@ PWD    := $(shell pwd)
 .PHONY: install
 
 all: module
-	$(MAKE) -C $(KDIR) M=$(PWD)
 
 module:
 	$(MAKE) -C $(KDIR) M=$(PWD)
