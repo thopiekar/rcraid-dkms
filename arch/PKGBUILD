@@ -1,0 +1,46 @@
+# Maintainer: foo <foo(at)example(dot)org>
+# Contributor: bar <bar(at)example(dot)org>
+
+_pkgbase=rcraid
+pkgname=rcraid-dkms
+pkgver=17.2.1
+pkgrel=2
+pkgdesc="AMD AM4 socket X370/X470 chipset motherbroad NVMe/SATA RAID driver (DKMS)"
+arch=('i686' 'x86_64')
+url="https://www.amd.com/en/support/chipsets/amd-socket-am4/x370"
+license=('GPL2')
+depends=('dkms')
+makedepends=('linux-headers>=4.15')
+source=('dkms.conf')
+md5sums=('3a14dcc84daf257a62727bcde1882edf')
+
+prepare()
+{
+  cp -r "${startdir}"/../src/* "${srcdir}"
+}
+
+build() {
+  cd ${srcdir}
+  make
+}
+
+package() {
+  # Copy dkms.conf
+  install -Dm644 "${startdir}"/dkms.conf "${pkgdir}"/usr/src/${_pkgbase}-${pkgver}/dkms.conf
+
+  # Set name and version
+  sed -e "s/@_PKGBASE@/${_pkgbase}/" \
+      -e "s/@PKGVER@/${pkgver}/" \
+      -i "${pkgdir}"/usr/src/${_pkgbase}-${pkgver}/dkms.conf
+
+
+if [ "$KVERS" == "" ]; then
+  KVERS=$(uname -r)
+fi
+  install -Dm644 rcraid.ko "${pkgdir}"/usr/lib/modules/$(echo -n $KVERS)/kernel/drivers/scsi/rcraid.ko
+
+  make clean
+  rm dkms.conf
+  rm rcraid.mod
+  cp -r * "${pkgdir}"/usr/src/${_pkgbase}-${pkgver}/
+}
