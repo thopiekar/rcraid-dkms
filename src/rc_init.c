@@ -1558,6 +1558,15 @@ rc_proc_dipm_open(struct inode *inode, struct file *file)
     return single_open(file, rc_proc_show_hex, &RC_EnableDIPM);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0)
+static const struct proc_ops rc_proc_dipm_fops = {
+    .proc_open       = rc_proc_dipm_open,
+    .proc_read       = seq_read,
+    .proc_lseek     = seq_lseek,
+    .proc_write	    = rc_proc_write_dipm,
+    .proc_release    = single_release,
+};
+#else
 static const struct file_operations rc_proc_dipm_fops = {
     .owner      = THIS_MODULE,
     .open       = rc_proc_dipm_open,
@@ -1566,6 +1575,7 @@ static const struct file_operations rc_proc_dipm_fops = {
     .write	    = rc_proc_write_dipm,
     .release    = single_release,
 };
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0) */
 
 static ssize_t
 rc_proc_write_hipm(struct file *file, const char __user *buffer,
@@ -1590,6 +1600,15 @@ rc_proc_hipm_open(struct inode *inode, struct file *file)
     return single_open(file, rc_proc_show_hex, &RC_EnableHIPM);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0)
+static const struct proc_ops rc_proc_hipm_fops = {
+    .proc_open       = rc_proc_hipm_open,
+    .proc_read       = seq_read,
+    .proc_lseek     = seq_lseek,
+    .proc_write	    = rc_proc_write_hipm,
+    .proc_release    = single_release,
+};
+#else
 static const struct file_operations rc_proc_hipm_fops = {
     .owner      = THIS_MODULE,
     .open       = rc_proc_hipm_open,
@@ -1598,6 +1617,7 @@ static const struct file_operations rc_proc_hipm_fops = {
     .write	    = rc_proc_write_hipm,
     .release    = single_release,
 };
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0) */
 
 static ssize_t
 rc_proc_write_debug(struct file *file, const char __user *buffer,
@@ -1637,6 +1657,15 @@ rc_proc_debug_open(struct inode *inode, struct file *file)
     return single_open(file, rc_proc_debug_show, NULL);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0)
+static const struct proc_ops rc_proc_debug_fops = {
+    .proc_open       = rc_proc_debug_open,
+    .proc_read       = seq_read,
+    .proc_lseek     = seq_lseek,
+    .proc_write      = rc_proc_write_debug,
+    .proc_release    = single_release,
+};
+#else
 static const struct file_operations rc_proc_debug_fops = {
     .owner      = THIS_MODULE,
     .open       = rc_proc_debug_open,
@@ -1645,6 +1674,7 @@ static const struct file_operations rc_proc_debug_fops = {
     .write      = rc_proc_write_debug,
     .release    = single_release,
 };
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0) */
 
 static ssize_t
 rc_proc_write_an(struct file *file, const char __user *buffer,
@@ -1678,6 +1708,15 @@ rc_proc_an_open(struct inode *inode, struct file *file)
     return single_open(file, rc_proc_show_hex, &RC_EnableAN);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0)
+static const struct proc_ops rc_proc_an_fops = {
+    .proc_open       = rc_proc_an_open,
+    .proc_read       = seq_read,
+    .proc_lseek     = seq_lseek,
+    .proc_write	= rc_proc_write_an,
+    .proc_release    = single_release,
+};
+#else
 static const struct file_operations rc_proc_an_fops = {
     .owner      = THIS_MODULE,
     .open       = rc_proc_an_open,
@@ -1686,6 +1725,7 @@ static const struct file_operations rc_proc_an_fops = {
     .write	= rc_proc_write_an,
     .release    = single_release,
 };
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0) */
 
 static ssize_t
 rc_proc_write_zpodd(struct file *file, const char __user *buffer,
@@ -1720,6 +1760,15 @@ rc_proc_zpodd_open(struct inode *inode, struct file *file)
     return single_open(file, rc_proc_show_hex, &RC_EnableZPODD);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0)
+static const struct proc_ops rc_proc_zpodd_fops = {
+    .proc_open       = rc_proc_zpodd_open,
+    .proc_read       = seq_read,
+    .proc_lseek     = seq_lseek,
+    .proc_write	    = rc_proc_write_zpodd,
+    .proc_release    = single_release,
+};
+#else
 static const struct file_operations rc_proc_zpodd_fops = {
     .owner      = THIS_MODULE,
     .open       = rc_proc_zpodd_open,
@@ -1728,6 +1777,7 @@ static const struct file_operations rc_proc_zpodd_fops = {
     .write	    = rc_proc_write_zpodd,
     .release    = single_release,
 };
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0) */
 
 static ssize_t
 rc_proc_write_delay(struct file *file, const char __user *buffer,
@@ -1751,6 +1801,15 @@ rc_proc_delay_open(struct inode *inode, struct file *file)
     return single_open(file, rc_proc_show_int, &rc_suspend_delay);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0)
+static const struct proc_ops rc_proc_delay_fops = {
+    .proc_open       = rc_proc_delay_open,
+    .proc_read       = seq_read,
+    .proc_lseek     = seq_lseek,
+    .proc_write	    = rc_proc_write_delay,
+    .proc_release    = single_release,
+};
+#else
 static const struct file_operations rc_proc_delay_fops = {
     .owner      = THIS_MODULE,
     .open       = rc_proc_delay_open,
@@ -1759,6 +1818,7 @@ static const struct file_operations rc_proc_delay_fops = {
     .write	    = rc_proc_write_delay,
     .release    = single_release,
 };
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0) */
 
 static int
 rc_proc_version_show(struct seq_file *sfile, void *v)
@@ -1773,6 +1833,14 @@ rc_proc_version_open(struct inode *inode, struct file *file)
     return single_open(file, rc_proc_version_show, NULL);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0)
+static const struct proc_ops rc_proc_version_fops = {
+    .proc_open       = rc_proc_version_open,
+    .proc_read       = seq_read,
+    .proc_lseek     = seq_lseek,
+    .proc_release    = single_release,
+};
+#else
 static const struct file_operations rc_proc_version_fops = {
     .owner      = THIS_MODULE,
     .open       = rc_proc_version_open,
@@ -1780,6 +1848,8 @@ static const struct file_operations rc_proc_version_fops = {
     .llseek     = seq_lseek,
     .release    = single_release,
 };
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0) */
+
 
 static int
 rc_proc_stats_show(struct seq_file *sfile, void *v)
@@ -1808,6 +1878,14 @@ rc_proc_stats_open(struct inode *inode, struct file *file)
     return single_open(file, rc_proc_stats_show, NULL);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0)
+static const struct proc_ops rc_proc_stats_fops = {
+    .proc_open       = rc_proc_stats_open,
+    .proc_read       = seq_read,
+    .proc_lseek     = seq_lseek,
+    .proc_release    = single_release,
+};
+#else
 static const struct file_operations rc_proc_stats_fops = {
     .owner      = THIS_MODULE,
     .open       = rc_proc_stats_open,
@@ -1815,12 +1893,17 @@ static const struct file_operations rc_proc_stats_fops = {
     .llseek     = seq_lseek,
     .release    = single_release,
 };
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0) */
 
 static struct proc_dir_entry *proc_parent = NULL;
 
 static const struct rc_proc_entry {
     const char                    *name;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0)
+    const struct proc_ops  *fops;
+#else
     const struct file_operations  *fops;
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(5,6,0) */
 } rc_proc_entries[] = {
     { "dipm", &rc_proc_dipm_fops },
     { "hipm", &rc_proc_hipm_fops },
