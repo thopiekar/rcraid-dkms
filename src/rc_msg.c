@@ -208,9 +208,12 @@ MODULE_PARM_DESC (SmartPollInterval, "SMART poll interval in seconds");
 int32_t
 rc_vprintf(uint32_t severity, const char *format, va_list ar)
 {
-	struct timeval tv;
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
-	struct timespec ts;
+	struct timespec64 ts;
+	struct __kernel_old_timeval tv;
+#else
+	struct timeval tv;
 #endif
         static int rc_saw_newline=1;
 
@@ -219,7 +222,7 @@ rc_vprintf(uint32_t severity, const char *format, va_list ar)
 
         if (severity && rc_saw_newline) {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
-		getnstimeofday(&ts);
+		ktime_get_real_ts64(&ts);
 		tv.tv_sec = ts.tv_sec;
 		tv.tv_usec = ts.tv_nsec / 1000;
 #else
