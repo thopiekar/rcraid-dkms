@@ -1,4 +1,4 @@
-Installation on Arch/Manjaro:
+# Installation on Arch/Manjaro
 
 Download and unpack zip or:
 
