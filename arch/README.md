@@ -26,9 +26,6 @@ then rebuild your initrd f.e.:
   mkinitcpio -p linux54
 ```
 
-Sources for this install were forked from https://github.com/thopiekar/rcraid-dkms
-I left original debian folder as im using many distros and its handy.
-
 Note: If you just planning on switching to rcraid, my advice is: don't. 
 Support from AMD for Promontory raid on Linux is pretty much non-existent. 
 You will be way better off sticking with mdadm, zfs or lvm. 
