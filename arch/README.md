@@ -1,20 +1,30 @@
 Installation on Arch/Manjaro:
 
-Download and unpack zip or "git clone https://github.com/misiektw/rcraid-dkms.git"
+Download and unpack zip or:
+
+```bash
+  git clone https://github.com/thopiekar/rcraid-dkms.git
+```
 
 From inside "arch" directory:
 
+```bash
   makepkg -si
-  
+```
+
 This will compile sources and install package for current running kernel. If you need 
 to make package for different kernel then you can use KVERS option.
 After installing edit /etc/mkinitcpio.conf and add
   
+```bash
   MODULES=(rcraid?)
+```
 
 then rebuild your initrd f.e.:
 
+```bash
   mkinitcpio -p linux54
+```
 
 Sources for this install were forked from https://github.com/thopiekar/rcraid-dkms
 I left original debian folder as im using many distros and its handy.
