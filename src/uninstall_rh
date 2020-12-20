@@ -1,0 +1,181 @@
+#!/bin/sh
+
+#
+# Script to remove the driver(s) from an existing RHEL linux install
+#
+# Copyright © 2006-2008 Ciprico Inc. All rights reserved.
+# Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
+# Copyright © 2020 Advanced Micro Devices, Inc. All rights reserved.
+#
+# Use of this software is subject to the terms and conditions of the written
+# software license agreement between you and AMD (the "License"),  
+# including, without limitation, the following (as further elaborated in the
+# License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND AMD DISCLAIMS
+# ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
+# BY CONDUCT, OR OTHERWISE; (ii) this software may be used only in connection
+# with the integrated circuit product and storage software with which it was
+# designed to be used; (iii) this source code is the confidential information
+# of AMD and may not be disclosed to any third party; and (iv) you may not
+# make any modification or take any action that would cause this software,
+# or any other Advanced Micro Devices software, to fall under any GPL license
+# or any other open source license.
+#
+#
+#  Script to uninstall the driver from the /lib/modules tree. By default
+#  drivers for all installed variations of the currently running kernel 
+#  will be uninstalled. 
+#
+
+drv_basename=rcraid
+kernel=
+flavors=
+
+source ./common_shell
+ 
+if [ $UID != 0 ] ; then
+    echo "This script must be run as root"
+    exit 1
+fi
+
+# Uninstalling drivers for the currently running kernel
+running_kernel=`uname -r| awk '{
+                sub("BOOT","",$0)
+		sub("smp","",$0)
+		sub("bigmem","",$0)
+                sub("hugemem","",$0)
+                sub("largesmp","",$0)
+		print $0
+	    }'`
+
+if [ -z $kernel ] ; then
+    kernel=$running_kernel
+fi
+
+if [ ! -e modules.cgz ] ; then
+    if [ ! -f Makefile ] ; then
+        echo "Either this is not a driver diskette or sdk or you need to cd to the"
+        echo "directory where the disk is mounted"
+        exit 1
+    fi
+else
+    # not sdk
+    # Make sure driver disk contains drivers for this kernel
+    if cat os_version | grep -v $kernel > /dev/null ; then
+        echo "This disk does not contain any driver uninstall scripts for kernel version $kernel"
+        exit 1
+    fi
+
+    # Verify that the disk contains drivers for this platform
+    platform=`uname -p`
+    if [[ $kernel = 2.6.* ]] && [ $platform = athlon ] ; then
+        platform=i686
+    fi
+    if cat platform | grep -v $platform > /dev/null ; then
+        echo "This disk dosen't contain driver uninstall scripts for $platform platform"
+        exit 1
+    fi
+fi
+
+# Get list of flavors if it wasn't specified on the command line..
+if [ -z $flavors ] ; then
+
+    # uniprocessor kernel is always installed.
+    flavors="uni"
+
+    # Check for installed version of requested kernel
+    base=$kernel
+    installed=`find /lib/modules -maxdepth 1 -name ${base}* -type d -printf "%f "`
+
+    # If that dosen't work get installed versions of currently running
+    # kernel for future kernel upgrade.
+    if [ -z "$installed" ] ; then
+	base=$running_kernel
+	installed=`find /lib/modules -maxdepth 1 -name ${base}* -type d -printf "%f "`
+    fi
+
+    for i in $installed ; do
+         flavors="$flavors `echo $i | sed -e s/$base//`"
+    done 
+fi
+
+# Fixups for the 2.6 kernel
+if [[ $kernel = 2.6.* ]] ; then
+    mod_ext=ko
+    mod_conf=/etc/modprobe.conf
+else
+    mod_ext=o
+    mod_conf=/etc/modules.conf
+fi
+
+drvname=$drv_basename.$mod_ext
+
+# Backup the modules.conf file
+if [ -f $mod_conf ] ; then
+    cp -p $mod_conf $mod_conf.bak
+fi
+
+failed=0
+failed_versions=
+for flavor in $flavors ; do
+
+    if [ $flavor = "uni" ] ; then
+	version=$kernel
+    else
+	version=$kernel$flavor
+    fi
+
+    echo uninstalling $drvname driver for $version
+
+    # Remove any old copies of the driver
+    if [ -d /lib/modules/$version ] ; then
+	find /lib/modules/$version -name $drvname -exec rm {} \;
+    fi
+
+    # For Fedora Core 2 and later the driver is uninstalled from the updates
+    # directory rather than kernel/drivers/scsi/$drv_basename
+    if [[ $kernel = 2.6.* ]] ; then
+	drv_dir=/lib/modules/$version/updates
+    else
+        drv_dir=/lib/modules/$version/kernel/drivers/scsi
+    fi
+
+    # Remove driver as a scsi_hostadapter from modules.conf (modprobe.conf)
+    del_module_config $drv_basename $mod_conf
+
+    # Remove use_swl option if present
+    del_swl_option $drv_basename $mod_conf
+
+    # Remove the driver from the initrd if necessary
+    map_file=/boot/System.map-$version
+    if [ -f $map_file ] ; then
+	/sbin/depmod -a -F $map_file $version
+
+	initrd=/boot/initrd-$version.img
+	if [ -f $initrd ]; then
+	    echo Making initrd $initrd
+	    /sbin/mkinitrd -f $initrd.new $version
+	    if [ $? -ne 0 ] ; then
+		echo Failed to make $initrd 
+		failed=`expr $failed - 1`
+		failed_version+=version
+		continue
+	    fi
+	    mv -f $initrd.new $initrd
+
+	    if [ -e /etc/lilo.conf ] ; then
+		/sbin/lilo
+	    fi
+	fi
+    fi
+
+    # Remove the driver modules
+    rm -rf $drv_dir/$drvname
+done
+
+if [ $failed -gt 0 ] ; then
+	echo "Uninstall failed for $failed_versions versions"
+        mv -f $mod_conf.bak $mod_conf
+	exit
+fi
+
+rm -rf $mod_conf.bak
