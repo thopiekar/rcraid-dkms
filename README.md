@@ -5,6 +5,7 @@ Foreword:
 ===========
 
 Many AMD mainboards for the AM4 socket based on the following chipsets come with RAID support:
+ * A320
  * X370
  * X399
  * X470
