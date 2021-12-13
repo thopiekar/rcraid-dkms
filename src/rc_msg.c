@@ -25,6 +25,7 @@
 #include "asm/msr.h"
 #include <linux/page-flags.h>
 #include <linux/vmalloc.h>
+#include <scsi/sg.h>
 #include "rc_ahci.h"
 
 int  rc_setup_communications(void);
@@ -1468,7 +1469,7 @@ rc_msg_send_srb(struct scsi_cmnd * scp)
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,26)
 	srb->timeout      = scp->timeout_per_command/HZ;
 #else
-	srb->timeout      = scp->request->timeout/HZ;
+	srb->timeout      = scsi_cmd_to_rq(scp)->timeout/HZ;
 #endif
 	srb->seq_num      = rc_srb_seq_num++;
 
