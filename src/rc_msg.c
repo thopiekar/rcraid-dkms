@@ -1466,10 +1466,12 @@ rc_msg_send_srb(struct scsi_cmnd * scp)
 	srb->scsi_context = scp;
 	srb->sg_list      = (rc_sg_list_t *)&srb->private32[0];
 	srb->dev_private  = (char *)srb->sg_list + sg_list_size;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,26)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+	srb->timeout      = scsi_cmd_to_rq(scp)->timeout/HZ;
+#elif (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,26))
 	srb->timeout      = scp->timeout_per_command/HZ;
 #else
-	srb->timeout      = scsi_cmd_to_rq(scp)->timeout/HZ;
+	srb->timeout      = scp->request->timeout/HZ;
 #endif
 	srb->seq_num      = rc_srb_seq_num++;
 

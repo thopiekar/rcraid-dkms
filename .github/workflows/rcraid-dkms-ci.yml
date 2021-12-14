@@ -1,0 +1,42 @@
+name: rcraid-dkms-ci
+on:
+  - push
+  - pull_request
+defaults:
+  run:
+    shell: bash
+jobs:
+  rcraid-dkms-ci-job:
+    env:
+      TERM: 'xterm-256color'
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-18.04
+          - ubuntu-20.04
+    runs-on: ${{ matrix.os }}
+    name: ${{ github.event.repository.name }}_${{ matrix.os }}
+    steps:
+      - name: ${{ github.event.repository.name }}_${{ matrix.os }}_checkout
+        uses: actions/checkout@v2
+
+      - name: ${{ github.event.repository.name }}_${{ matrix.os }}_environment_details
+        run: |
+          uname -r
+          uname -a
+          cat /etc/os-release
+          ls -1 /lib/modules/
+
+      - name: ${{ github.event.repository.name }}_${{ matrix.os }}_install_build_depdencies
+        run: |
+          sudo apt install -y --no-install-recommends make linux-headers-generic
+
+      - name: ${{ github.event.repository.name }}_${{ matrix.os }}_make
+        run: |
+          cd src
+          echo
+          ls -1 /lib/modules/
+          echo
+          export KVERS="$(ls -1 /lib/modules/ | tail -n1)"
+          make
