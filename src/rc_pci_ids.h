@@ -42,11 +42,18 @@
 #define RC_PD_VID_AMD            0x1022  // AMD
 #define RC_PD_VID_LSI            0x1000  // LSI
 #define RC_PD_VID_DELL           0x1028  // DELL
+#define RC_PD_VID_SEAGATE        0x1BB1  // Seagate
 
 #define RC_PD_VID_RAM            0x8590  // RAMDISK
 #define RC_PD_VID_HP	         0x103C  // DELL
 #define RC_PD_VID_SAMSUNG		 0x144D  // Samsung
 #define RC_PD_VID_ASMEDIA		 0x1B21
+
+#define RC_PD_VID_GENERIC_NVME   0xFFFF
+
+#define RC_PD_CLASS_RAID         0x4
+#define RC_PD_CLASS_SATA         0x6
+#define RC_PD_CLASS_NVME         0x8
 
 /****************************************************************************\
 *
@@ -86,7 +93,8 @@
                                            // AMD Server Riverside SWL 50
 #define RC_PD_DID_BRISTOL           0x7905 // PCIe AMD Bristol RAID mode
 #define RC_PD_DID_PROMONTORY        0x43BD // PCIe AMD Promontory Chipset
-#define RC_PD_DID_SUMMIT            0x7916 // PCIe AMD Summit RAID mode
+#define RC_PD_DID_SUMMIT            0x7916 // PCIe AMD Summit AM4 RAID mode
+#define RC_PD_DID_SUMMIT_SP3        0x7917 // PCIe AMD Summit SP3 RAID mode
 #define RC_PD_DID_LSI1068E          0x0058 // PCIe LSI1068 Adapater
 #define RC_PD_DID_LSI1068           0x0059 // Motherboard LSI1068
 #define RC_PD_DID_FALCON            0x0072 // MPT2 Falcon Adapter
@@ -97,6 +105,7 @@
 #define RC_PD_DID_TURBO_SSD2       	0xA802 // Samsung Turbo SSD
 #define RC_PD_DID_ASMEDIA_AHCI		0x0612
 #define RC_PD_DID_HPZ820  	        0x1D02 // HP Z820 AHCI MODE
+#define RC_PD_DID_SEAGATE_JAGUAR	0x0100
 
 
 // HP Sub Device IDs
@@ -106,5 +115,8 @@
 #define RC_PD_SDID_ORCHID   	     0x2B17 // HP ORCHID - AMD KABINI RAID Driver
 #define RC_PD_SDID_GLADIATOR   	     0x225F // HP GLADIATOR - AMD KABINI RAID Driver
 #define RC_PD_SDID_ORCHID2   	     0x2B35 // HP ORCHID2 - AMD KABINI RAID Driver
+
+#define AMD_NVME_DID                 0xB000
+
 
 #endif //_RC_PCI_IDS_H

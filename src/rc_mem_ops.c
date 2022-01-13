@@ -3,6 +3,7 @@
  * Copyright © 2006-2008 Ciprico Inc. All rights reserved.
  * Copyright © 2008-2015 Dot Hill Systems Corp. All rights reserved.
  * Copyright © 2015-2016 Seagate Technology LLC. All rights reserved.
+ * Copyright © 2019, Advanced Micro Devices, Inc. All rights reserved.
  *
  * Use of this software is subject to the terms and conditions of the written
  * software license agreement between you and DHS (the "License"),
@@ -19,7 +20,6 @@
  *
  ****************************************************************************/
 
-#include "linux/signal.h"
 #include "linux/vmalloc.h"
 #include "linux/wait.h"
 #include "linux/sched.h"
@@ -39,6 +39,8 @@
 #ifdef CONFIG_HIGHMEM
 #include "asm/highmem.h"
 #endif
+
+#include "linux/signal.h"
 
 #include "rc.h"
 
@@ -349,11 +351,7 @@ rc_mem_clear_list(rc_sg_list_t *dst, int byte_count)
 
 				pfn = dst_dma_addr >> PAGE_SHIFT;
 				dst_page = pfn_to_page(pfn);
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                 dst_vaddr = kmap_atomic(dst_page);
-#else
-                dst_vaddr = kmap_atomic(dst_page, KM_USER1);
-#endif
 				if (dst_vaddr == 0)
 					return 0;
 
@@ -361,14 +359,14 @@ rc_mem_clear_list(rc_sg_list_t *dst, int byte_count)
 				dst_mapped = size;
 				dst_offset = dst_offset + size;
 				RC_PRINTK(RC_DEBUG3, "dst[%d]: dma_addr 0x%llx size 0x%x "
-					  "map_addr 0x%x vaddr %p offset 0x%x mapped 0x%x\n",
+					  "map_addr 0x%x vaddr %px offset 0x%x mapped 0x%x\n",
 					  dst_idx, (rc_uint64_t)dst_dma_addr, size,
 					  pfn << PAGE_SHIFT, dst_vaddr, dst_offset, dst_mapped);
 			}
 			else if ((dst->sg_mem_type & MEM_TYPE) == RC_MEM_VADDR) {
 				dst_vaddr = dst->sg_elem[dst_idx].v_addr;
 				dst_mapped = dst->sg_elem[dst_idx].size;
-				rc_printk(RC_DEBUG3, "dst[%d]: vaddr %p size: %x\n", dst_idx,
+				rc_printk(RC_DEBUG3, "dst[%d]: vaddr %px size: %x\n", dst_idx,
 					  dst_vaddr, dst_mapped);
 			}
 			else
@@ -377,7 +375,7 @@ rc_mem_clear_list(rc_sg_list_t *dst, int byte_count)
 
 		xfer_cnt = min(residual, dst_mapped);
 
-		RC_PRINTK(RC_DEBUG3, "rc_mem_clear_list: clearing %x bytes at %p\n",
+		RC_PRINTK(RC_DEBUG3, "rc_mem_clear_list: clearing %x bytes at %px\n",
 			  xfer_cnt, dst_vaddr);
 
 		memset(dst_vaddr, 0, xfer_cnt);
@@ -388,11 +386,7 @@ rc_mem_clear_list(rc_sg_list_t *dst, int byte_count)
 		if (dst_mapped == 0) {
 			if ((dst->sg_mem_type & MEM_TYPE) == RC_MEM_PADDR) {
 				if (dst_page)
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                     kunmap_atomic(dst_vaddr);
-#else
-					kunmap_atomic(dst_vaddr, KM_USER1);
-#endif
 				dst_page = (struct page *)0;
 				if (dst_offset == dst->sg_elem[dst_idx].size) {
 					dst_idx++;
@@ -408,11 +402,7 @@ rc_mem_clear_list(rc_sg_list_t *dst, int byte_count)
 	}
 
 	if (dst_page)
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
         kunmap_atomic(dst_vaddr);
-#else
-		kunmap_atomic(dst_vaddr, KM_USER1);
-#endif
 	if (residual)
 		rc_printk(RC_PANIC, "rc_mem_clear_list: residual is not 0 at end "
 			  "of loop\n");
@@ -488,18 +478,10 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 
 				pfn = src_dma_addr >> PAGE_SHIFT;
 				src_page = pfn_to_page(pfn);
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                 src_vaddr = kmap_atomic(src_page);
-#else
-				src_vaddr = kmap_atomic(src_page, KM_USER0);
-#endif
 				if (src_vaddr == 0) {
 					if (dst_page)
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                         kunmap_atomic(dst_vaddr);
-#else
-						kunmap_atomic(dst_vaddr, KM_USER1);
-#endif
 					ret = 0;
 					goto out;
 				}
@@ -508,7 +490,7 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 				src_mapped = size;
 				src_offset = src_offset + size;
 				RC_PRINTK(RC_DEBUG3, "%s: src[%d]: dma_addr 0x%llx size 0x%x "
-					  "map_addr 0x%x vaddr %p offset 0x%x mapped 0x%x\n",
+					  "map_addr 0x%x vaddr %px offset 0x%x mapped 0x%x\n",
 					  __FUNCTION__,
 					  src_idx, (rc_uint64_t)src_dma_addr, size,
 					  pfn << PAGE_SHIFT, src_vaddr, src_offset, src_mapped);
@@ -516,7 +498,7 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 			else if ((src->sg_mem_type & MEM_TYPE) == RC_MEM_VADDR) {
 				src_vaddr = src->sg_elem[src_idx].v_addr;
 				src_mapped = src->sg_elem[src_idx].size;
-				RC_PRINTK(RC_DEBUG3, "%s: src[%d]: vaddr %p size %x\n",
+				RC_PRINTK(RC_DEBUG3, "%s: src[%d]: vaddr %px size %x\n",
 					  __FUNCTION__,
 					  src_idx,
 					  src_vaddr, src_mapped);
@@ -536,18 +518,10 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 
 				pfn = dst_dma_addr >> PAGE_SHIFT;
 				dst_page = pfn_to_page(pfn);
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                 dst_vaddr = kmap_atomic(dst_page);
-#else
-				dst_vaddr = kmap_atomic(dst_page, KM_USER1);
-#endif
 				if (dst_vaddr == 0) {
 					if (src_page)
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                         kunmap_atomic(src_vaddr);
-#else
-						kunmap_atomic(src_vaddr, KM_USER0);
-#endif
 					ret = 0;
 					goto out;
 				}
@@ -556,7 +530,7 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 				dst_mapped = size;
 				dst_offset = dst_offset + size;
 				RC_PRINTK(RC_DEBUG3, "%s: dst[%d]: dma_addr 0x%llx size 0x%x "
-					  "map_addr 0x%x vaddr %p offset 0x%x mapped 0x%x\n",
+					  "map_addr 0x%x vaddr %px offset 0x%x mapped 0x%x\n",
 					  __FUNCTION__,
 					  dst_idx, (rc_uint64_t)dst_dma_addr, size,
 					  pfn << PAGE_SHIFT, dst_vaddr, dst_offset,
@@ -565,7 +539,7 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 			else if ((dst->sg_mem_type & MEM_TYPE) == RC_MEM_VADDR) {
 				dst_vaddr = dst->sg_elem[dst_idx].v_addr;
 				dst_mapped = dst->sg_elem[dst_idx].size;
-				rc_printk(RC_DEBUG3, "%s: dst[%d]: vaddr %p size: 0x%x\n",
+				rc_printk(RC_DEBUG3, "%s: dst[%d]: vaddr %px size: 0x%x\n",
 					  __FUNCTION__,
 					  dst_idx,
 					  dst_vaddr, dst_mapped);
@@ -577,7 +551,7 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 
 		xfer_cnt = min(src_mapped, dst_mapped);
 		xfer_cnt = min(residual, xfer_cnt);
-		RC_PRINTK(RC_DEBUG3, "%s: moving %x bytes from %p to %p\n",
+		RC_PRINTK(RC_DEBUG3, "%s: moving %x bytes from %px to %px\n",
 			  __FUNCTION__,
 			  xfer_cnt,src_vaddr, dst_vaddr);
 
@@ -594,11 +568,7 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 		if (src_mapped == 0) {
 			if ((src->sg_mem_type & MEM_TYPE) == RC_MEM_PADDR) {
 				if (src_page)
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                     kunmap_atomic(src_vaddr);
-#else
-					kunmap_atomic(src_vaddr, KM_USER0);
-#endif
 				src_page = (struct page *)0;
 				if (src_offset == src->sg_elem[src_idx].size) {
 					src_idx++;
@@ -614,11 +584,7 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 		if (dst_mapped == 0) {
 			if ((dst->sg_mem_type & MEM_TYPE) == RC_MEM_PADDR) {
 				if (dst_page)
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
                     kunmap_atomic(dst_vaddr);
-#else
-					kunmap_atomic(dst_vaddr, KM_USER1);
-#endif
 				dst_page = (struct page *)0;
 				if (dst_offset == dst->sg_elem[dst_idx].size) {
 					dst_idx++;
@@ -635,17 +601,9 @@ rc_mem_copy_list ( rc_sg_list_t *dst, rc_sg_list_t *src, int byte_count)
 out:
 
 	if (src_page)
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
         kunmap_atomic(src_vaddr);
-#else
-		kunmap_atomic(src_vaddr, KM_USER0);
-#endif
 	if (dst_page)
-#if LINUX_VERSION_CODE > KERNEL_VERSION(3,6,0)
         kunmap_atomic(dst_vaddr);
-#else
-		kunmap_atomic(dst_vaddr, KM_USER1);
-#endif
 	if (residual)
 		rc_printk(RC_PANIC, "rc_mem_copy_list: residual is not 0 at end of "
 			  "loop\n");
@@ -681,7 +639,7 @@ rc_check_addr_one(rc_uint64_t addr, rc_uint32_t id, rc_uint32_t    byte_count)
 		      (unsigned long)vaddr >= VMALLOC_END) &&
 		     !virt_addr_valid(vaddr) ) {
 			rc_printk(RC_PANIC,
-				  "rc_check_addr_one: Invalid virtual address - %p\n",
+				  "rc_check_addr_one: Invalid virtual address - %px\n",
 				  vaddr);
 			return status;
 		}
@@ -739,7 +697,7 @@ rc_check_addr_list(rc_addr_list_t *addr_list)
 				      (unsigned long)vaddr >= VMALLOC_END) &&
 				     !virt_addr_valid(vaddr) ) {
 					rc_printk(RC_PANIC, "rc_check_addr_list: Invalid virtual "
-						  "address - %p\n", vaddr);
+						  "address - %px\n", vaddr);
 					return status;
 				}
 			}

@@ -30,7 +30,7 @@ Installation
     ```
   * Switching to RAID mode:
     * Boot Linux in AHCI mode.
-    * Append `modprobe.blacklist=ahci` to GRUB_CMDLINE_LINUX_DEFAULT in /etc/default/grub
+    * Append `modprobe.blacklist=ahci,nvme` to GRUB_CMDLINE_LINUX_DEFAULT in /etc/default/grub
     * Run `sudo update-grub`
     * Restart
     * Switch to RAID mode

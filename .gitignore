@@ -13,3 +13,7 @@ src/rcraid.ko
 # Generated files
 src/rcraid.mod.c
 src/vers.c
+src/.modules*.cmd
+src/.Module*.cmd
+
+*.patch

@@ -3,6 +3,7 @@
  * Copyright © 2006-2008 Ciprico Inc. All rights reserved.
  * Copyright © 2008-2015 Dot Hill Systems Corp. All rights reserved.
  * Copyright © 2015-2016 Seagate Technology LLC. All rights reserved.
+ * Copyright © 2019-2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Use of this software is subject to the terms and conditions of the written
  * software license agreement between you and DHS (the "License"),
@@ -38,21 +39,22 @@ void rc_msg_check_int_tasklet(unsigned long arg);
 
 void rc_msg_send_srb_function (rc_softstate_t *state, int function_code);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
 void rc_msg_timer(unsigned long data);
 #else
-void rc_msg_timer(struct timer_list * t);
+void rc_msg_timer(struct timer_list *t);
 #endif
 
 void rc_msg_timeout(int to);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
 void rc_msg_timeout_done(unsigned long data);
 #else
-void rc_msg_timeout_done(struct timer_list * t);
+void rc_msg_timeout_done(struct timer_list *t);
 #endif
 
 void rc_msg_isr(rc_adapter_t *adapter);
 void rc_msg_schedule_dpc(void);
+void rc_msg_cpuid(unsigned int function, unsigned int* eax, unsigned int* ebx, unsigned int* ecx, unsigned int* edx);
 void rc_msg_srb_done(struct rc_srb_s *srb);
 void rc_msg_srb_complete(struct rc_srb_s *srb);
 void rc_msg_build_sg(rc_srb_t *srb);
@@ -81,23 +83,9 @@ static struct rc_interface_s *rc_interface_header = &RC_OurInterfaceStruct;
 
 int rc_srb_seq_num = 0;
 
-static void rc_sysrq_intr (int key
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
-			   ,struct pt_regs *pt_regs
-#endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36)
-			   ,struct tty_struct * tty
-#endif
-			   );
+static void rc_sysrq_intr (int key);
 
-static void rc_sysrq_state (int key
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
-			    ,struct pt_regs *pt_regs
-#endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36)
-			   ,struct tty_struct * tty
-#endif
-			   );
+static void rc_sysrq_state (int key);
 
 struct sysrq_key_op rc_skey_ops_intr = {
 handler:    rc_sysrq_intr,
@@ -111,13 +99,6 @@ help_msg:   "rcraid-Dump-state",
 action_msg: "Dumping rcraid state",
 };
 
-#define check_lock(sp) {						\
-		if (sp->osic_locked) {					\
-			rc_printk(RC_WARN, "%s: osic already locked by %s\n", __FUNCTION__, \
-				  sp->osic_lock_holder);		\
-			panic("osic_lock already held\n");		\
-		}							\
-	}
 
 void
 rc_set_sense_data (char *sense, uint8_t sense_key, uint8_t sense_code,
@@ -203,38 +184,50 @@ MODULE_PARM (SmartPollInterval, "i");
 #endif
 MODULE_PARM_DESC (SmartPollInterval, "SMART poll interval in seconds");
 
+static char sbuf[256];
+
 /*
  * Simple wrapper function to map printf calls from the core to vprintk
  */
 int32_t
 rc_vprintf(uint32_t severity, const char *format, va_list ar)
 {
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)
-	struct timespec64 ts;
-	struct __kernel_old_timeval tv;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
+	struct timeval tv = { 0 };
 #else
-	struct timeval tv;
+	struct timespec64 tv = { 0 };
 #endif
-        static int rc_saw_newline=1;
+    static int rc_saw_newline=1;
 
 	if (severity > rc_msg_level)
 		return 0;
 
-        if (severity && rc_saw_newline) {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
-		ktime_get_real_ts64(&ts);
-		tv.tv_sec = ts.tv_sec;
-		tv.tv_usec = ts.tv_nsec / 1000;
-#else
+    // Only print timestamp if new line -- i.e.
+    // last user message had a newline character.
+    if (severity && rc_saw_newline) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
 		do_gettimeofday(&tv);
-#endif
 		printk("rcraid: (%li.%06li) ", tv.tv_sec, tv.tv_usec);
+#else
+		ktime_get_real_ts64(&tv);
+		//printk("rcraid: (%lli.%06li) ", tv.tv_sec, tv.tv_nsec);
+#endif
+
+        rc_saw_newline = 0; // No newline in timestamp
 	}
 
+    if (rc_saw_newline)
+    {
+        // Last user message had a newline character -- this
+        // is a new message, not a continuation
         rc_saw_newline = strchr(format, '\n') ? 1 : 0;
-
-	return vprintk(format, ar);
+        return vprintk(format, ar);
+    } else {
+        // No newline so this message needs to be a continuation.
+        // Put into temp buffer then print with KERN_CONT attribute.
+        vscnprintf(sbuf, sizeof(sbuf), format, ar);
+        return printk(KERN_CONT "%s", sbuf);
+    }
 }
 
 /*
@@ -260,9 +253,10 @@ rc_setup_communications(void)
 		//    We found the interface structure!! Fill in the values
 		//    with what we will use!
 		//
-		rc_printk(RC_DEBUG, "send_function: offset: %p\n", rc_interface_header->send_function);
+		//rc_printk(RC_DEBUG, "send_function: offset: %px\n", rc_interface_header->send_function);
 		rc_interface_header->receive_function = &rc_receive_msg;
         rc_interface_header->schedule_dpc_function = & rc_msg_schedule_dpc;
+		rc_interface_header->cpuid_function = &rc_msg_cpuid;
 		return 1;
 	}
 	return 0;
@@ -370,7 +364,7 @@ void rc_msg_suspend(rc_softstate_t *state, rc_adapter_t* adapter)
         if (rc_dev[i]->private_mem.vaddr) {
 	        args.call_type = RC_CTS_STOP_ADAPTER;
             args.u.adapterMemory = rc_dev[i]->private_mem.vaddr;
-    	    rc_send_msg(&args);
+            rc_send_msg(&args);
 	    }
         else {
             rc_printk(RC_ERROR, "%s: no adapter memory :( \n",__FUNCTION__);
@@ -434,6 +428,9 @@ void rc_msg_resume(rc_softstate_t *state, rc_adapter_t* adapter)
 void
 rc_msg_shutdown( rc_softstate_t *statep)
 {
+	rc_softstate_t *state = &rc_state;
+	rc_send_arg_t   args;
+	int             i;
 
 	/*
 	 * send a message to the OSIC to shutdown
@@ -445,11 +442,32 @@ rc_msg_shutdown( rc_softstate_t *statep)
 	rc_printk(RC_INFO2, "rc_msg_shutdown: shutting down OSIC\n");
 	rc_msg_send_srb_function(statep, RC_SRB_SHUTDOWN);
 
+
 	rc_printk(RC_INFO2, "rc_msg_shutdown: stop OSIC timer\n");
 	statep->state &= ~ENABLE_TIMER;
 	del_timer_sync(&statep->timer);
 	rc_printk(RC_DEBUG, "rc_msg_shutdown: pausing for 1/4 second\n");
 	rc_msg_timeout(HZ>>2);
+
+    // make sure all IOs are completed
+	spin_lock(&state->osic_lock);
+	check_lock(state);
+	state->osic_locked = 1;
+	state->osic_lock_holder = "rc_msg_suspend";
+
+    for (i = state->num_hba - 1; i >= 0; i--)
+    {
+        if (rc_dev[i]->private_mem.vaddr) {
+	        args.call_type = RC_CTS_STOP_ADAPTER;
+            args.u.adapterMemory = rc_dev[i]->private_mem.vaddr;
+            rc_send_msg(&args);
+	    }
+        else {
+            rc_printk(RC_ERROR, "%s: no adapter memory :( \n",__FUNCTION__);
+        }
+    }
+    state->osic_locked = 0;
+	spin_unlock(&state->osic_lock);
 
 	rc_printk(RC_INFO2, "rc_msg_shutdown: OSIC disabled \n");
 	statep->state &= ~USE_OSIC;
@@ -462,7 +480,7 @@ rc_msg_shutdown( rc_softstate_t *statep)
 	tasklet_kill(&statep->srb_q.tasklet);
 
 	if (statep->virtual_memory) {
-		rc_printk(RC_DEBUG, "rc_msg_shutdown: free virtual memory %p\n",
+		rc_printk(RC_DEBUG, "rc_msg_shutdown: free virtual memory %px\n",
 			  statep->virtual_memory);
 		vfree(statep->virtual_memory);
 		statep->virtual_memory_size = 0;
@@ -470,7 +488,7 @@ rc_msg_shutdown( rc_softstate_t *statep)
 	}
 
 	if (statep->cache_memory) {
-		rc_printk(RC_DEBUG, "rc_msg_shutdown: free cache memory %p\n",
+		rc_printk(RC_DEBUG, "rc_msg_shutdown: free cache memory %px\n",
 			  statep->cache_memory);
 		vfree(statep->cache_memory);
 		statep->cache_memory_size = 0;
@@ -490,6 +508,7 @@ void rc_msg_pci_config(rc_pci_op_t *pci_op, rc_uint32_t call_type)
 {
     struct pci_dev *pdev = (struct pci_dev *) NULL;
     rc_uint8_t tmp = 0x00;
+	rc_uint16_t tmp16 = 0;
 
     if (pci_op &&
         (pci_op->adapter < MAX_HBA) &&
@@ -505,6 +524,12 @@ void rc_msg_pci_config(rc_pci_op_t *pci_op, rc_uint32_t call_type)
                 pci_op->val = tmp;
             }
             break;
+		case RC_PCI_READ_CONFIG_WORD:
+			pci_op->status = pci_read_config_word(pdev, pci_op->offset, &tmp16);
+			if (!pci_op->status) {
+                pci_op->val = tmp16;
+            }
+			break;
         case RC_PCI_READ_CONFIG_DWORD:
             pci_op->status = pci_read_config_dword(pdev, pci_op->offset, &(pci_op->val));
             break;
@@ -583,11 +608,7 @@ int rc_wq_handler(void *work)
                         acpi_status ac_stat;
 
                         // Clear any pending notifcations
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,0,0)
-                        ac_stat = acpi_clear_gpe(NULL, RC_ODD_GpeNumber, ACPI_NOT_ISR);
-#else
                         ac_stat = acpi_clear_gpe(NULL, RC_ODD_GpeNumber);
-#endif  /* LINUX_VERSION_CODE < KERNEL_VERSION(3,0,0) */
                         // Arm for notification
                         ac_stat = acpi_enable_gpe(NULL, RC_ODD_GpeNumber);
                     }
@@ -736,9 +757,9 @@ rc_receive_msg(void)
 		rc_vprintf(args->u.print_va.severity, args->u.print_va.format, args->u.print_va.va_l);
 		break;
 
-    case RC_CTR_SCHEDULE_DPC:
-        rc_msg_schedule_dpc();
-        break;
+	case RC_CTR_SCHEDULE_DPC:
+		rc_msg_schedule_dpc();
+		break;
 
 	case RC_CTR_WAIT_MICROSECONDS:
 		delay = args->u.wait_microseconds.microseconds;
@@ -748,18 +769,25 @@ rc_receive_msg(void)
 		// erroneous Soft CPU lockup's.
 		// Note touch_nmi_watchdog() implies touch_softlockup_watchdog() on all
 		// architectures that support it, and does nothing on those that don't.
-		// SUSE 10.1 exports it in header file, but fails to link it in...
-		// Works on 10.2....  Hmmm - Well Spinlocks never observed on any
-		// SUSE and this is a simple way to exclude it - so lets
-		// just exclude it from all SUSE kernels.
-#ifndef CONFIG_SUSE_KERNEL
-		touch_nmi_watchdog();
-#endif
-
 		if (delay <= 1000) {
-			preempt_disable();
-			udelay(delay);
-			preempt_enable();
+			if((1 == state->osic_locked) && ((state->state & ENABLE_TIMER) || \
+						(state->state & PROCESS_INTR))) {
+				preempt_disable();
+				udelay(delay);
+				preempt_enable();
+				break;
+			}
+			/*(SWDEV-274844) 9.3.0.261_RHEL | Soft lockup |
+			 * Getting soft lockup issue after every boot
+			 * when system booted with RAID drivers*/
+			if((!(state->state & INIT_DONE)) || \
+					(0 == state->osic_locked)) {
+				usleep_range(delay , delay);
+			} else {
+				preempt_disable();
+				udelay(delay);
+				preempt_enable();
+			}
 			break;
 		}
 		//
@@ -807,6 +835,7 @@ rc_receive_msg(void)
         break;
 
 	case RC_PCI_READ_CONFIG_BYTE:
+	case RC_PCI_READ_CONFIG_WORD:
 	case RC_PCI_READ_CONFIG_DWORD:
 	case RC_PCI_WRITE_CONFIG_BYTE:
 	case RC_PCI_WRITE_CONFIG_DWORD:
@@ -940,6 +969,18 @@ void rc_msg_kill_tasklets(rc_softstate_t *state)
     tasklet_kill(&state->intr_tasklet);
 }
 
+
+void rc_msg_cpuid(unsigned int function, unsigned int* eax, unsigned int* ebx, unsigned int* ecx, unsigned int* edx)
+{
+
+
+	cpuid(function,eax, ebx, ecx, edx);
+
+	rc_printk(RC_DEBUG2,"rc_msg_cpuid eax=0x%x, ebx=0x%x, ecx=0x%x, edx=0x%x\n", *eax, *ebx, *ecx, *edx);
+
+}
+
+
 /*
  * setup the whole message passing system
  */
@@ -948,9 +989,10 @@ int
 rc_msg_init(rc_softstate_t *state)
 {
 
-	rc_send_arg_t    args;
-	int         i, size,  period;
+	rc_send_arg_t	args = { 0 };
+	int             i, size,  period;
 	rc_adapter_t    *adapter;
+
 
 	/*
 	 * find the initialization struct and fill in our function pointer
@@ -1002,7 +1044,7 @@ rc_msg_init(rc_softstate_t *state)
 	/*
 	 *  send a  get_info msg to get setup info
 	 */
-	memset(&args, 0, sizeof(args));
+	memset(&args, 0, sizeof(rc_send_arg_t));
 	args.call_type = RC_CTS_GET_INFO;
 	args.u.get_info.controller_count = state->num_hba;
 	args.u.get_info.max_sg_map_elements = RC_SG_MAX_ELEMENTS;
@@ -1087,11 +1129,7 @@ rc_msg_init(rc_softstate_t *state)
 		rc_printk(RC_INFO, "rcraid: set parameter SmartPollInterval = %d "
 			  "seconds\n", SmartPollInterval);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,31)
-    args.u.get_info.support4kNativeDisks = 0;
-#else
     args.u.get_info.support4kNativeDisks = 1;
-#endif
 
 	rc_send_msg(&args);
 
@@ -1129,7 +1167,7 @@ rc_msg_init(rc_softstate_t *state)
 
 		adapter->private_mem.vaddr = addr;
 		adapter->private_mem.size = state->memsize_per_controller;
-		rc_printk(RC_DEBUG, "rc_msg_init: private mem controller %d @ %p len "
+		rc_printk(RC_DEBUG, "rc_msg_init: private mem controller %d @ %px len "
 			  "%d\n", i, adapter->private_mem.vaddr,
 			  adapter->private_mem.size );
 	}
@@ -1141,7 +1179,7 @@ rc_msg_init(rc_softstate_t *state)
 	for (i = 0; i < state->num_hba; i++) {
 		adapter = rc_dev[i];
 
-		memset(&args, 0, sizeof(args));
+		memset(&args, 0, sizeof(rc_send_arg_t));
 		args.call_type = RC_CTS_INIT_CONTROLLER;
 		args.u.init_controller.controller_memory = adapter->private_mem.vaddr;
 		args.u.init_controller.controller_memory_id = RC_MEM_VADDR;
@@ -1149,18 +1187,26 @@ rc_msg_init(rc_softstate_t *state)
 		args.u.init_controller.pci_config_space =
 			adapter->hardware.pci_config_space;
 		args.u.init_controller.pci_config_space_length = PCI_CFG_SIZE;
+        args.u.init_controller.orig_vendor_id = adapter->hardware.orig_vendor_id;
+        args.u.init_controller.orig_device_id = adapter->hardware.orig_device_id;
+        args.u.init_controller.pci_location =
+            (rc_uint32_t) ((((adapter->hardware.pci_func & 0xFF) << 8) | (adapter->hardware.pci_slot & 0xFF)) << 8) | (adapter->hardware.pci_bus & 0xFF);
 		args.u.init_controller.bar_memory[adapter->version->which_bar] =
 			adapter->hardware.vaddr;
 		args.u.init_controller.bar_length[adapter->version->which_bar] =
 			adapter->hardware.mem_len;
         args.u.init_controller.context = (void *) adapter;
-        args.u.init_controller.regread = rc_ahci_regread;
-        args.u.init_controller.regwrite = rc_ahci_regwrite;
+	if (adapter->version->swl_type == RC_SHWL_TYPE_AHCI) {
+            args.u.init_controller.regread = rc_ahci_regread;
+            args.u.init_controller.regwrite = rc_ahci_regwrite;
+	}
 
 		// Fill in the rest
-		rc_printk(RC_DEBUG, "rc_msg_init: init controller %d\n", i);
+		rc_printk(RC_DEBUG, "rc_msg_init: init controller %d - &args %px\n", i, &args);
+
+
 		rc_send_msg(&args);
-		rc_printk(RC_DEBUG, "rc_msg_init: init controller %d Done\n", i);
+		rc_printk(RC_ALERT, "rc_msg_init: init controller %d Done\n", i);
 		/* return status ??? */
 	}
 
@@ -1179,7 +1225,7 @@ rc_msg_init(rc_softstate_t *state)
 		}
 		memset(state->virtual_memory, 0, state->virtual_memory_size);
 	}
-	rc_printk(RC_DEBUG,"rc_msg_init: alloc %d @ %p for virtual memory\n",
+	rc_printk(RC_DEBUG,"rc_msg_init: alloc %d @ %px for virtual memory\n",
 		  state->virtual_memory_size, state->virtual_memory);
 
 
@@ -1195,7 +1241,7 @@ rc_msg_init(rc_softstate_t *state)
 		}
 		memset(state->cache_memory, 0, state->cache_memory_size);
 	}
-	rc_printk(RC_DEBUG,"rc_msg_init: alloc %d @ %p for cache memory\n",
+	rc_printk(RC_DEBUG,"rc_msg_init: alloc %d @ %px for cache memory\n",
 		  state->cache_memory_size,
 		  state->cache_memory);
 
@@ -1247,18 +1293,17 @@ rc_msg_init(rc_softstate_t *state)
 	/*
 	 * intialize the periodic timer for the OSIC
 	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
 	init_timer(&state->timer);
 	state->timer.expires = jiffies  + state->timer_interval ;
 	state->timer.data = (unsigned long)state;
 	state->timer.function = rc_msg_timer;
+	add_timer(&state->timer);
 #else
 	timer_setup(&state->timer, rc_msg_timer, 0);
-	state->timer.expires = jiffies + state->timer_interval;
+	mod_timer(&state->timer, jiffies + state->timer_interval);
 #endif
 	state->state |= ENABLE_TIMER;
-
-	add_timer(&state->timer);
 
     rc_printk(RC_INFO2,"rc_msg_init: timer started.... wait for callback \n");
 	down(&state->init_sema);
@@ -1282,17 +1327,19 @@ rc_msg_init(rc_softstate_t *state)
 	 */
 	return(0);
 }
+
 void
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
 rc_msg_timer(unsigned long data)
 #else
-rc_msg_timer(struct timer_list * t)
+rc_msg_timer(struct timer_list *t)
 #endif
 {
 	rc_softstate_t *state;
 	rc_send_arg_t    args;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
 	state = (rc_softstate_t *)data;
 #else
 	state = from_timer(state, t, timer);
@@ -1304,16 +1351,16 @@ rc_msg_timer(struct timer_list * t)
 	/*
 	 * set up timeout
 	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
 	init_timer(&state->timer);
 	state->timer.expires = jiffies  + state->timer_interval;
 	state->timer.data = (unsigned long)state;
 	state->timer.function = rc_msg_timer;
-#else
-	timer_setup(&state->timer, rc_msg_timer,0);
-	state->timer.expires = jiffies + state->timer_interval;
-#endif
 	add_timer(&state->timer);
+#else
+	timer_setup(&state->timer, rc_msg_timer, 0);
+	mod_timer(&state->timer, jiffies + state->timer_interval);
+#endif
 
 	spin_lock(&state->osic_lock);
 	check_lock(state);
@@ -1462,14 +1509,18 @@ rc_msg_send_srb(struct scsi_cmnd * scp)
 	srb->cdb          = scp->cmnd;
 	srb->cdb_len      = scp->cmd_len;
 	srb->sense        = scp->sense_buffer;
-	srb->sense_len    = sizeof(scp->sense_buffer);
+    // SWDEV-253195/SWDEV-253204
+    // sizeof(scp->sense_buffer) is returning size of pointer, not
+    // size of buffer. SCSI type 70h sense data requires more space
+    // and is not being copied completely. Linux SCSI layer requires
+    // that sense_buffer be at LEAST SCSI_SENSE_BUFFERSIZE (96 bytes)
+    // in length --  use that for length.
+	srb->sense_len    = SCSI_SENSE_BUFFERSIZE;
 	srb->scsi_context = scp;
 	srb->sg_list      = (rc_sg_list_t *)&srb->private32[0];
 	srb->dev_private  = (char *)srb->sg_list + sg_list_size;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	srb->timeout      = scsi_cmd_to_rq(scp)->timeout/HZ;
-#elif (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,26))
-	srb->timeout      = scp->timeout_per_command/HZ;
 #else
 	srb->timeout      = scp->request->timeout/HZ;
 #endif
@@ -1728,10 +1779,6 @@ rc_msg_srb_q_tasklet(  unsigned long arg)
 			rc_msg_process_srb(srb);
 			spin_lock_irqsave(&state->srb_q.lock, irql);
 			if (stat_last_pending != atomic_read(&state->intr_pending)) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0) // (4,2,0)
-				if (!stat_intr_low)
-					rdtscl(stat_intr_low);
-#endif	/* LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0) // (4,2,0) */
 			}
 		}
 		// STATS
@@ -1749,9 +1796,6 @@ rc_msg_srb_q_tasklet(  unsigned long arg)
 		}
 		sp->total_intr_waiting += stat_last_pending;
 		if (stat_intr_low) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0) // (4,2,0)
-			rdtscl(stat_intr_hi);
-#endif	/* LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0) // (4,2,0) */
 			stat_intr_hi -= stat_intr_low;
 			if (sp->max_intr_delay < stat_intr_hi)
 				sp->max_intr_delay = stat_intr_hi;
@@ -1759,8 +1803,11 @@ rc_msg_srb_q_tasklet(  unsigned long arg)
 
         spin_unlock_irqrestore(&state->srb_q.lock, irql);
 
-	} while (progress);
+	} while (progress && !need_resched());
 
+	if(progress) {
+		tasklet_schedule(&state->srb_q.tasklet);
+	}
 }
 
 void
@@ -1795,7 +1842,7 @@ void
 rc_msg_srb_done(rc_srb_t *srb)
 {
 	rc_softstate_t *state;
-	unsigned long irql;
+	//unsigned long irql;
 
 	state = &rc_state;
 
@@ -1810,10 +1857,14 @@ rc_msg_srb_done(rc_srb_t *srb)
 	// STATS
 	atomic_dec(&state->stats.srb_pending);
 
+	rc_msg_srb_complete(srb);
+
+
+
 	/*
 	 * add to tail of srb queue
 	 */
-
+/*
 	spin_lock_irqsave(&state->srb_done.lock, irql);
 
 	if (state->srb_done.head == (rc_srb_t *)0) {
@@ -1826,6 +1877,7 @@ rc_msg_srb_done(rc_srb_t *srb)
 	spin_unlock_irqrestore(&state->srb_done.lock, irql);
 
 	tasklet_schedule(&state->srb_done.tasklet);
+*/
 }
 
 void
@@ -1875,6 +1927,14 @@ rc_msg_srb_complete(struct rc_srb_s *srb)
 		 //          srb->seq_num);
 		scp->result = DID_OK << 16 | COMMAND_COMPLETE << 8 | GOOD;
 
+        // SWDEV-253195/SWDEV-253204
+        // Core is returning SUCCESS even when sense data is present.
+        // This causes some libraries to fail because they apparently
+        // rely only on the return code while other code actually checks
+        // for returned sense data. If non-zero sense data, set return
+        // code to indicate CHECK_CONDITION.
+        if (((unsigned char *) srb->sense)[0] != 0)     // sense data returned
+            scp->result = SAM_STAT_CHECK_CONDITION;
 		GET_IO_REQUEST_LOCK_IRQSAVE(irql);
 		scp->scsi_done(scp);
 		PUT_IO_REQUEST_LOCK_IRQRESTORE(irql);
@@ -2097,22 +2157,6 @@ rc_msg_build_sg( rc_srb_t *srb)
 
 	rc_sg = srb->sg_list;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-	if (scp->use_sg == 0) {       /* has to be a virtual address */
-		rc_sg->sg_num_elem = 1;
-		rc_sg->sg_elem[0].size   = scp->request_bufflen;
-		rc_sg->sg_elem[0].v_addr = scp->request_buffer;
-		rc_sg->sg_mem_type = RC_MEM_VADDR;
-
-		// RC_PRINTK(RC_DEBUG2, "rc_msg_build_sg: scp: 0x%p use_sg 0, buf "
-		//           "0x%8x:%8x, len %d\n", scp,
-		//           (rc_uint32_t)(rc_sg->sg_elem[0].dma_paddr >> 32),
-		//           (rc_uint32_t)(rc_sg->sg_elem[0].dma_paddr & 0xffffffff),
-		//           rc_sg->sg_elem[0].size);
-		return;
-	}
-#endif
-
 	has_highmem = 0;
 
 	if (ForcePhysAddr && scp->device->id != 16) {
@@ -2268,7 +2312,7 @@ rc_msg_map_mem(struct map_memory_s *map)
 		 */
 		if ((vaddr >= private_start) && (vaddr < private_end) ) {
 			if (vaddr + len >=  private_end) {
-				rc_printk(RC_WARN, "rc_msg_map_mem: invalid address range: %p len %d\n", vaddr, len);
+				rc_printk(RC_WARN, "rc_msg_map_mem: invalid address range: %px len %d\n", vaddr, len);
 				map->number_bytes = 0;
 				goto out;
 			}
@@ -2382,23 +2426,25 @@ rc_msg_unmap_mem(struct unmap_memory_s *unmap)
 
 
 void
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
 rc_msg_timeout_done(unsigned long data)
-#else
-rc_msg_timeout_done(struct timer_list * t)
-#endif
 {
 	rc_softstate_t *state;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
 	state = (rc_softstate_t *)data;
 	init_timer(&state->msg_timeout);
-#else
-	state = from_timer(state, t, msg_timeout);
-	timer_setup(&state->msg_timeout, rc_msg_timeout_done, 0);
-#endif
 	up(&state->msg_timeout_sema);
 }
+#else
+rc_msg_timeout_done(struct timer_list *t)
+{
+	rc_softstate_t *state;
+
+	state = from_timer(state, t, msg_timeout);
+	timer_setup(&state->msg_timeout, rc_msg_timeout_done, 0);
+	up(&state->msg_timeout_sema);
+}
+#endif
 
 void
 rc_msg_timeout( int to)
@@ -2410,30 +2456,41 @@ rc_msg_timeout( int to)
 	 * set up timeout
 	 */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4,15,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
 	init_timer(&state->msg_timeout);
 	state->msg_timeout.expires = jiffies  + to;
 	state->msg_timeout.data = (unsigned long)state;
 	state->msg_timeout.function = rc_msg_timeout_done;
+	add_timer(&state->msg_timeout);
 #else
 	timer_setup(&state->msg_timeout, rc_msg_timeout_done, 0);
-	state->msg_timeout.expires = jiffies  + to;
+	mod_timer(&state->msg_timeout, jiffies + to);
 #endif
-	add_timer(&state->msg_timeout);
 	down(&state->msg_timeout_sema);
 
 }
+
 
 void
 rc_msg_access_ok(rc_access_ok_t accessOk)
 {
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
-    accessOk.returnStatus = access_ok( accessOk.access_location, accessOk.access_size);
-#else
-    accessOk.returnStatus = access_ok( VERIFY_WRITE , accessOk.access_location, accessOk.access_size);
-#endif /* LINUX_VERSION_CODE */
 
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,0,0)
+#ifdef VERIFY_WRITE
+	accessOk.returnStatus = access_ok( VERIFY_WRITE , accessOk.access_location, accessOk.access_size);
+#else
+ 	accessOk.returnStatus = access_ok(accessOk.access_location, accessOk.access_size);
+
+#endif
+#else
+
+    accessOk.returnStatus = access_ok(accessOk.access_location, accessOk.access_size);
+
+
+
+#endif
 }
 
 
@@ -2558,14 +2615,7 @@ rc_msg_stats(char *buf, int buf_size)
 	return(cnt);
 }
 
-static void rc_sysrq_intr (int key
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
-			   ,struct pt_regs *pt_regs
-#endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36)
-			   ,struct tty_struct * tty
-#endif
-                           )
+static void rc_sysrq_intr (int key)
 {
 	rc_softstate_t *state;
 
@@ -2582,14 +2632,7 @@ static void rc_sysrq_intr (int key
 	rc_printk(RC_ALERT, "scheduling tasklet interrupt\n");
 }
 
-static void rc_sysrq_state (int key
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
-			    ,struct pt_regs *pt_regs
-#endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36)
-			   ,struct tty_struct * tty
-#endif
-			   )
+static void rc_sysrq_state (int key)
 {
 
 	rc_msg_stats(rc_stats_buf, sizeof(rc_stats_buf));

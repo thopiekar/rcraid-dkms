@@ -1,16 +1,18 @@
 =================================================================
 RAIDCore LINUX SDK README
+AMD-RAID RAIDXpert2 LINUX SDK README
 
 Copyright (c) 2006.  Broadcom Corporation.  All rights reserved.
 Copyright (c) 2006-2008 Ciprico Inc.  All rights reserved.
 Copyright (c) 2008-2013 Dot Hill Systems Corp.  All rights reserved.
+Copyright (c) 2017-2021 Advanced Micro Devices Inc.  All rights reserved.
 =================================================================
 
 These instructions apply to building AMD AMD-RAID drivers
 on Linux systems.
 
 It is possible to build the driver for many distributions based on Linux
-version 2.6 kernels without having the complete kernel source tree available.
+version 3.10 and newer kernels without having the complete kernel source tree available.
 
 Simply running the command 'make install' in the src/ directory with no
 arguments will make the driver for the currently running kernel and install it.
@@ -19,17 +21,19 @@ To build and install the driver for a recently updated kernel before rebooting
 into the new kernel version, use the KVERS make argument to override the kernel
 version.  For example:
 
-    make KVERS=2.6.18-164.el5       install      # Red Hat 5.4
-    make KVERS=2.6.27.19-5-default  install      # SLES 11.0
+    make KVERS=3.10.0-862.el7.x86_64		install      # Red Hat 7.5
+    make KVERS=4.18.0-193.el8.x86_64		install      # Red Hat 8.2
+    make KVERS=4.18.0-240.el8.x86_64		install      # Red Hat 8.3
+    make KVERS=5.4.0.26-x86_64			install      # Ubuntu 20.04
 
 You can override both the kernel version and the location of the kernel objects
 when doing the make for custom kernels or unsupported distributions.
 For example:
 
-    make KVERS=2.6.30.3-mykern install
-    make KVERS=2.6.30.3-mykern KDIR=/test/lib/modules/2.6.30.3-mykern install
+    make KVERS=4.12.0.5 mykern install
+    make KVERS=4.12.0.5-mykern KDIR=/test/lib/modules/4.12.0.5-mykern install
 
-On supported Red Hat and SLES systems, the "install" make target will run
+On supported Red Hat and Ubuntu systems, the "install" make target will run
 the appropriate script that will complete the installation by updating module
 configuration files and rebuilding the initrd image.
 
@@ -46,5 +50,5 @@ include:
 Consult your system documentation for the exact steps necessary and the syntax
 of the commands.
 
-Product Version: 8.1.0
-Product Build: 8.1.0-00039
+Product Version: 9.3.0
+Product Build: 9.3.0-00276

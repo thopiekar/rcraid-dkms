@@ -1,6 +1,7 @@
 /****************************************************************************
  *
  * Copyright 2010-2013 Dot Hill Systems Corp. All rights reserved.
+ * Copyright © 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  ****************************************************************************/
 
@@ -17,6 +18,7 @@
 #include <linux/pagemap.h>
 #include <linux/interrupt.h>
 #include <linux/compat.h>
+#include <linux/pci.h>          // struct msix_entry
 
 #include <scsi/scsi.h>
 #include <scsi/sg.h>
@@ -135,7 +137,6 @@ rccfg_io(struct sg_io_hdr *hdr)
 
 	/* always copy data in from user */
 	if(copy_from_user(data, hdr->dxferp, hdr->dxfer_len)) {
-		printk("%s: copy_from_user failed\n",__FUNCTION__);
 		err = -EFAULT;
 		goto out_data_free;
 	}
@@ -176,7 +177,6 @@ rccfg_io(struct sg_io_hdr *hdr)
 	hdr->status = srb->status;
 
 	if(copy_to_user(hdr->dxferp, data, hdr->dxfer_len)) {
-		printk("%s: copy_from_user failed\n",__FUNCTION__);
 		err = -EFAULT;
 		goto out_data_free;
 	}

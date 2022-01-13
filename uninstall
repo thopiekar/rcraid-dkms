@@ -1,23 +1,24 @@
-#!/bin/sh
+#!/bin/bash
 #
 #  Script to uninstall the RAIDCore drivers from the SDK for supported platforms
-#  (RedHat and SuSE).
+#  (RedHat and Ubuntu).
 #
 # Copyright © 2006-2008 Ciprico Inc. All rights reserved.
 # Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
+# Copyright © 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Use of this software is subject to the terms and conditions of the written
-# software license agreement between you and DHS (the "License"),
+# software license agreement between you and AMD (the "License"),
 # including, without limitation, the following (as further elaborated in the
-# License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND DHS DISCLAIMS
+# License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND AMD DISCLAIMS
 # ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
 # BY CONDUCT, OR OTHERWISE; (ii) this software may be used only in connection
 # with the integrated circuit product and storage software with which it was
 # designed to be used; (iii) this source code is the confidential information
-# of DHS and may not be disclosed to any third party; and (iv) you may not
+# of AMD and may not be disclosed to any third party; and (iv) you may not
 # make any modification or take any action that would cause this software,
-# or any other Dot Hill software, to fall under any GPL license or any other
-# open source license.
+# or any other Advanced Micro Devices software, to fall under any GPL license
+# or any other open source license.
 #
 
 if [ $UID != 0 ] ; then
@@ -27,10 +28,8 @@ fi
 
 if [ -e /etc/redhat-release ]; then
 	(cd src; sh ./uninstall_rh);
-elif [ -e /etc/SuSE-release ]; then
-	(cd src; sh ./uninstall_suse);
 else
 	KVERS=`uname -r`
-	rm -f /lib/modules/$(KVERS)/kernel/drivers/scsi/rcraid.ko
+	rm -f /lib/modules/$KVERS/kernel/drivers/scsi/rcraid.ko
 	exit
 fi

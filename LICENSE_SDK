@@ -1,9 +1,11 @@
 =================================================================
-RAIDCore SDK LICENSE
+RAIDCore SDK NOTICE
+AMD-RAID RAIDXpert2 SDK NOTICE
 
 Copyright (c) 2006. Broadcom Corporation.  All rights reserved.
 Copyright (c) 2006-2008 Ciprico Inc.  All rights reserved.
 Copyright (c) 2008-2013 Dot Hill Systems Corp.  All rights reserved.
+Copyright (c) 2017-2021 Advanced Micro Devices Inc.  All rights reserved.
 =================================================================
 
 	The files distributed in this Software Development Kit
@@ -11,18 +13,18 @@ are covered by multiple  software licenses.   One set of licenses applies
 to the binary files in the distribution.  A different license applies
 to the source files.
 
-	The bcblob binary file, and any other files that are distributed
+	The rcblob binary file, and any other files that are distributed
 only in binary format, are licensed for binary use only under a software
-license agreement with Dot Hill Systems.  If you purchased a RAIDCore controller
+license agreement with AMD.  If you obtained RAIDXpert2
 as an end user, the product included a binary use end user license.  If you
 are an Original Equipment Manufacturer, reseller, installer, integrator,
 or other entity in the business of providing computer hardware products in
 the chain of manufacture or distribution to End Users, you must execute
-a license agreement with Dot Hill Systems for the use and distribution of these
+a license agreement with AMD for the use and distribution of these
 binary files.
 
 	The source files included in this distribution have a different
 license agreement and that license is included in the source files.
 
-Product Version: 8.1.0
-Product Build: 8.1.0-00039
+Product Version: 9.3.0
+Product Build: 9.3.0-00276

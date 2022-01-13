@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Common shell routines used by the top level install script (SDK and driver
 # disks) and also from the OS specific scripts in the SDK (also contains
@@ -6,44 +6,32 @@
 #
 # Copyright © 2006-2008 Ciprico Inc. All rights reserved.
 # Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
+# Copyright © 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Use of this software is subject to the terms and conditions of the written
-# software license agreement between you and DHS (the "License"),
+# software license agreement between you and AMD (the "License"),
 # including, without limitation, the following (as further elaborated in the
-# License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND DHS DISCLAIMS
+# License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND AMD DISCLAIMS
 # ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
 # BY CONDUCT, OR OTHERWISE; (ii) this software may be used only in connection
 # with the integrated circuit product and storage software with which it was
 # designed to be used; (iii) this source code is the confidential information
-# of DHS and may not be disclosed to any third party; and (iv) you may not
+# of AMD and may not be disclosed to any third party; and (iv) you may not
 # make any modification or take any action that would cause this software,
-# or any other Dot Hill software, to fall under any GPL license or any other
-# open source license.
+# or any other Advanced Micro Devices software, to fall under any GPL license
+# or any other open source license.
 #
 # defines for SWL (Software Licensing) - SATA chipsets on motherboards
 # that are supported by RAIDCore(tm)
-SWL_SUPPORTED="ahci lsi1068 lsi2008"
+SWL_SUPPORTED="ahci"
 SWL_MODULE_ahci=ahci
-SWL_MODULE_lsi1068=mptsas
-SWL_MODULE_lsi2008=mpt2sas
 # WARNING: these need to be kept in sync with RC_SWL_TYPE_XXX in bc_adapter.h
 SWL_TYPE_ahci=0x00000002
-SWL_TYPE_lsi1068=0x00000004
-SWL_TYPE_lsi2008=0x00000008
-
-function usage_suse() {
-    echo "usage: `basename $0` [<options>][<kernel>]" >&2
-    echo "  options:" >&2
-    echo "    USE_SWL=[none,ahci,lsi1068,lsi2008] - comma seperated list of onboard chips RAIDCore " >&2
-    echo "                                 should use.  Default is all." >&2
-    echo "  ex: `basename $0` USE_SWL=ahci 2.6.16.21-0.25-smp" >&2
-    exit 1
-}
 
 function usage_rh() {
     echo "usage: `basename $0` [<options>][<kernel>] [<smp|hugemem|largesmp|PAE>]" >&2
     echo "  options:" >&2
-    echo "    USE_SWL=[none,ahci,lsi1068,lsi2008] - comma seperated list of onboard chips RAIDCore " >&2
+    echo "    USE_SWL=[none,ahci] - comma seperated list of onboard chips RAIDCore " >&2
     echo "                                 should use.  Default is all." >&2
     echo "  ex: `basename $0` USE_SWL=ahci 2.6.20-1.2933.fc6 uni smp" >&2
     exit 1
@@ -219,83 +207,3 @@ function del_swl_option() {
     fi
 }
 
-# Add an initrd module for SuSE systems
-# Note: INITRD_MODULES comes from the $kernel_cfg file
-add_initrd_mod_suse() {
-    local driver=$1
-    local kernel_cfg=$2
-    local use_swl=$3
-    local swl
-    local updated=0
-    local add_first=0
-    local module
-
-    if [ -f $kernel_cfg ] ; then
-        source $kernel_cfg
-    else
-        echo "invalid kernel config file: $kernel_cfg"
-        exit 1
-    fi
-
-    if [ -z "$INITRD_MODULES" ] ; then
-        INITRD_MODULES=${driver}
-        updated=1
-    else
-        # if USE_SWL is set AND one of the USE_SWL modules is already being
-        # used, then, and only then, we need the RAIDCore driver to load first,
-        # but the RAIDCore configuration device should still always be last
-        if echo $INITRD_MODULES | grep -v ${driver} > /dev/null ; then
-            for swl in ${use_swl}; do
-                module=SWL_MODULE_${swl}
-                if ! echo $INITRD_MODULES | grep -v ${!module} > /dev/null; then
-                    add_first=1
-                fi
-            done
-            if [ ${add_first} = 1 ]; then
-                INITRD_MODULES="${driver} $INITRD_MODULES"
-            else
-                INITRD_MODULES="$INITRD_MODULES ${driver}"
-            fi
-            updated=1
-        fi
-    fi
-
-    if [ $updated = 1 ] ; then
-        if [ -f $kernel_cfg ] ; then
-            if grep INITRD_MODULES $kernel_cfg > /dev/null ; then
-                cat $kernel_cfg | sed -e s/^INITRD_MODULES=.*$/INITRD_MODULES=\""$INITRD_MODULES"\"/ > $kernel_cfg.tmp
-                mv $kernel_cfg.tmp $kernel_cfg
-            else
-                echo INITRD_MODULES=\"$INITRD_MODULES\" >> $kernel_cfg
-            fi
-        else
-            echo INITRD_MODULES=\"$INITRD_MODULES\" >> $kernel_cfg
-        fi
-    fi
-}
-
-# Remove an initrd module for SuSE systems
-# Note: INITRD_MODULES comes from the $kernel_cfg file
-del_initrd_mod_suse() {
-    local driver=$1
-    local kernel_cfg=$2
-    local updated=0
-
-    if [ -f $kernel_cfg ] ; then
-        source $kernel_cfg
-        if [ -n "$INITRD_MODULES" ] ; then
-            if echo $INITRD_MODULES | grep ${driver} > /dev/null; then
-                INITRD_MODULES=${INITRD_MODULES//${driver}/}
-                updated=1
-            fi
-        fi
-    else
-        echo "invalid kernel config file: $kernel_cfg"
-        exit 1
-    fi
-
-    if [ $updated = 1 ] ; then
-        cat $kernel_cfg | sed -e s/^INITRD_MODULES=.*$/INITRD_MODULES=\""$INITRD_MODULES"\"/ > $kernel_cfg.tmp
-        mv $kernel_cfg.tmp $kernel_cfg
-    fi
-}

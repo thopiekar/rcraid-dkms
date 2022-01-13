@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #  Script to install the driver into the /lib/modules tree for RedHat distros.
 #  By default new drivers will be installed for the currently running kernel.
@@ -9,19 +9,20 @@
 #
 # Copyright © 2006-2008 Ciprico Inc. All rights reserved.
 # Copyright © 2008-2013 Dot Hill Systems Corp. All rights reserved.
+# Copyright © 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Use of this software is subject to the terms and conditions of the written
-# software license agreement between you and DHS (the "License"),
+# software license agreement between you and AMD (the "License"),
 # including, without limitation, the following (as further elaborated in the
-# License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND DHS DISCLAIMS
+# License):  (i) THIS SOFTWARE IS PROVIDED "AS IS", AND AMD DISCLAIMS
 # ANY AND ALL WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY,
 # BY CONDUCT, OR OTHERWISE; (ii) this software may be used only in connection
 # with the integrated circuit product and storage software with which it was
 # designed to be used; (iii) this source code is the confidential information
-# of DHS and may not be disclosed to any third party; and (iv) you may not
+# of AMD and may not be disclosed to any third party; and (iv) you may not
 # make any modification or take any action that would cause this software,
-# or any other Dot Hill software, to fall under any GPL license or any other
-# open source license.
+# or any other Advanced Micro Devices software, to fall under any GPL license
+# or any other open source license.
 #
 
 drv_basename=rcraid
@@ -29,7 +30,7 @@ kernel=
 flavors=
 sdk=
 
-USE_SWL="ahci,lsi1068,lsi2008"
+USE_SWL="ahci"
 
 source ./common_shell
 
@@ -66,7 +67,7 @@ USE_SWL=${USE_SWL//none/ }
 for swl in ${USE_SWL}; do
     if lists_intersect $swl "${SWL_SUPPORTED}"; then
         echo "$swl is not a supported SWL option"
-        usage_suse $0
+        usage_rh $0
         exit 1
     fi
 done
@@ -228,6 +229,20 @@ for flavor in $flavors ; do
 
 	    if [ -e /etc/lilo.conf ] ; then
 		/sbin/lilo
+	    fi
+	else
+	    initrd=/boot/initramfs-$version.img
+	    if [ -f $initrd ]; then
+		echo "Making initrd $initrd with: $INITRD_OPTS"
+		/bin/dracut -f $initrd $version
+		if [ $? -ne 0 ] ; then
+		    echo Failed to make $initrd
+		    continue
+		fi
+
+		if [ -e /etc/lilo.conf ] ; then
+			/sbin/lilo
+		fi
 	    fi
 	fi
     fi

@@ -2,6 +2,7 @@
  *
  * Copyright © 2006-2008 Ciprico Inc. All rights reserved.
  * Copyright © 2008-2015 Dot Hill Systems Corp. All rights reserved.
+ * Copyright © 2019-2020, Advanced Micro Devices, Inc. All rights reserved.
  *
  * Use of this software is subject to the terms and conditions of the written
  * software license agreement between you and DHS (the "License"),
@@ -48,6 +49,7 @@
 			       RC_INTERFACE_VERSION)
 
 typedef void (rc_function_t)(void);
+typedef void (rc_function_cpuid_t)(rc_uint32_t, rc_uint32_t*,rc_uint32_t*,rc_uint32_t*,rc_uint32_t*);
 
 #define RC_NUM_TUNABLE_PARAMS 32
 typedef enum {
@@ -270,6 +272,7 @@ typedef struct  rc_morb_s {
 #define RC_CTS_CHANGE_PARAM     16
 #define     RC_CTS_PARAM_AN         1
 #define     RC_CTS_PARAM_ZPODD      2
+#define RC_CTS_SCSI_INFO        17
 
 typedef    struct rc_init_controller_s {
 	//
@@ -284,6 +287,9 @@ typedef    struct rc_init_controller_s {
 	rc_uint16_t bar_port[6];          // Port bars
 	rc_uint16_t controller_memory_id; // memory type
 	rc_uint16_t reserved;
+	rc_uint16_t orig_vendor_id;     // Original VendorID before trapping
+	rc_uint16_t orig_device_id;     // Original DeviceID before trapping
+	rc_uint32_t pci_location;       // PCI bus Bus/Slot/Function information
 
 	//
 	//    Input from STH
@@ -295,9 +301,9 @@ typedef    struct rc_init_controller_s {
 	rc_uint32_t min_virtual_memory_size_needed;
 	rc_uint32_t min_cache_memory_size_needed;
 
-    rc_uint32_t (*regread)(void *, rc_uint32_t);
-    void        (*regwrite)(void *, rc_uint32_t, rc_uint32_t);
-    void        *context;
+	rc_uint32_t (*regread)(void *, rc_uint32_t);
+	void        (*regwrite)(void *, rc_uint32_t, rc_uint32_t);
+	void        *context;
 } rc_init_controller_t;
 
 typedef struct rc_final_init_s {
@@ -313,6 +319,12 @@ typedef struct rc_final_init_s {
 	rc_uint32_t timer_interval;
 } rc_final_init_t;
 
+typedef struct rc_scsi_info_s {
+    rc_uint32_t     bus;
+    rc_uint32_t     target;
+    rc_uint32_t     lun;
+    rc_uint32_t     value;
+} rc_scsi_info_t;
 
 //
 //    Structure which contains the send argument information
@@ -344,26 +356,27 @@ typedef struct rc_send_arg_s {
 			rc_uint32_t parameter_mask;
 			rc_uint32_t tunable_parameters[RC_NUM_TUNABLE_PARAMS];
             rc_uint32_t support4kNativeDisks;
-		} get_info;
+		} get_info __attribute__ ((aligned(8)));
 		struct rc_init_controller_s init_controller;
-		struct rc_final_init_s final_init;
+		struct rc_final_init_s final_init __attribute__ ((aligned(8)));
 		struct {
 			//
 			//    Sent to STH from driver
 			//
 			void *controller_handle;
-		} interrupt_call;
+		} interrupt_call __attribute__ ((aligned(8)));
 		struct {
 			struct rc_srb_s *srb;
 			rc_uint32_t queued;    // 1 if queued
-		} send_srb;
+		} send_srb __attribute__ ((aligned(8)));
         struct {
             rc_uint32_t     param;
             rc_uint32_t     value;
-        } change_param;
-		rc_mem_op_resp_t mem_op_resp;
-		rc_uint32_t    max_print_severity;
-        void *adapterMemory;
+        } change_param __attribute__ ((aligned(8)));
+		rc_mem_op_resp_t mem_op_resp __attribute__ ((aligned(8)));
+		rc_uint32_t    max_print_severity __attribute__ ((aligned(8)));
+        void *adapterMemory __attribute__ ((aligned(8)));
+        rc_scsi_info_t rc_scsi_info __attribute__ ((aligned(8)));
 	} u;
 } rc_send_arg_t;
 
@@ -393,6 +406,7 @@ typedef struct rc_send_arg_s {
 #define RC_CTR_ACCESS_OK            1020
 #define RC_ACPI_INVOKE              1021
 #define RC_ACPI_REGISTER            1022
+#define RC_PCI_READ_CONFIG_WORD     1023
 
 #define RC_CTR_PFTYPE_32_BIT    1
 #define RC_CTR_PFTYPE_64_BIT    2
@@ -514,6 +528,7 @@ typedef struct rc_interface_s {
 
 	rc_function_t *receive_function;
     rc_function_t *schedule_dpc_function;
+	rc_function_cpuid_t *cpuid_function;
 	struct rc_receive_arg_s *receive_arg;
 } rc_interface_t;
 

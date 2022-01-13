@@ -38,7 +38,9 @@ static int rc_event_kthread(void *arg);
 extern int rc_srb_seq_num;
 
 rc_event_thread_t rc_event_thread;
-
+#if 0
+static int rc_scsi_delay = 200;
+#endif
 int
 rc_event_init(void)
 {
@@ -494,10 +496,18 @@ rc_notify_scsi_layer(int channel, int target, int lun, int present)
 		return error;
 
 	if (present) {
+#if 0
+        if (rc_scsi_delay)
+            mdelay(rc_scsi_delay);
+#endif
 		error = scsi_add_device(shost, channel, target, lun);
 	} else {
 		sdev = scsi_device_lookup(shost, channel, target, lun);
 		if (sdev) {
+#if 0
+            if (rc_scsi_delay)
+                mdelay(rc_scsi_delay);
+#endif
 			scsi_remove_device(sdev);
 			scsi_device_put(sdev);
 			error = 0;
