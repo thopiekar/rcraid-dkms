@@ -102,6 +102,8 @@ if [ -f $RCMODULE ]; then
 		SIGN_TOOL=/usr/src/linux-headers-$KVERS/scripts/sign-file
 	    elif [ -f "/target/usr/src/linux-headers-$KVERS/scripts/sign-file" ]; then
 		SIGN_TOOL=/target/usr/src/linux-headers-$KVERS/scripts/sign-file
+	    elif [ -f "/usr/lib/modules/$KVERS/build/scripts/sign-file" ]; then
+		SIGN_TOOL=/usr/lib/modules/$KVERS/build/scripts/sign-file
 	    fi
             $SIGN_TOOL $SHA $RCCERT/module_signing_key.priv $RCCERT/module_signing_key.der $RCMODULE
             if [ $? -ne 0 ]; then
@@ -124,6 +126,8 @@ if [ -f $RCMODULE ]; then
 	       SIGN_TOOL=/usr/src/linux-headers-$KVERS/scripts/sign-file
 	   elif [ -f "/target/usr/src/linux-headers-$KVERS/scripts/sign-file" ]; then
 	       SIGN_TOOL=/target/usr/src/linux-headers-$KVERS/scripts/sign-file
+	   elif [ -f "/usr/lib/modules/$KVERS/build/scripts/sign-file" ]; then
+	       SIGN_TOOL=/usr/lib/modules/$KVERS/build/scripts/sign-file
 	   fi
 	   $SIGN_TOOL sha256 $RCCERT/module_signing_key.priv $RCCERT/module_signing_key.der $RCMODULE
 	   if [ $? -ne 0 ]; then
