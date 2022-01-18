@@ -30,7 +30,7 @@ RC_USER=$(shell whoami)
 RC_DATE=$(shell /bin/date)
 RC_BUILD_DATE=$(shell /bin/date +'%b %d %Y')
 RCCERT=/var/lib/rccert/certs
-PLATFORM=$(shell uname -i)
+PLATFORM=$(shell uname -m)
 ifeq ($(PLATFORM), unknown)
     PLATFORM=$(shell uname -m)
 endif
@@ -158,10 +158,9 @@ sign:	rcraid.ko
 	@$(PWD)/../mk_certs $(SIGN_TOOL) $(PWD)/rcraid.ko $(RCCERT) $(KVERS)
 
 clean:
-	@rm -f *.o *.ko vers.c .*.cmd .*.d
+	@rm -f *.o *.ko vers.c .*.cmd .*.d *.mod
 	@rm -f rcraid.mod.c Module.symvers Modules.symvers modules.order
 	@rm -rf .tmp_versions
-	@ln -s rcblob.x86_64 rcblob.x86_64.o
 
 install: ibanner
 	@if [ -e /etc/redhat-release ]; then                             \
@@ -197,7 +196,7 @@ $(obj)/vers.c:
 
 # hack to avoid warning about missing .rcblob.cmd file when modpost tries to
 # find all the sources
-.PHONY: $(obj)/rcblob.${PLATFORM}
 .PHONY: $(obj)/rcblob.${PLATFORM}.o
-$(obj)/rcblob.${PLATFORM}:
+$(obj)/rcblob.${PLATFORM}.o:
+	ln -sf `basename $@ .o` $@
 	@( echo "cmd_$@ := true"; echo "dep_$@ := \\"; echo "	$@ \\"; echo "" ) > $(obj)/.`basename $@`.cmd

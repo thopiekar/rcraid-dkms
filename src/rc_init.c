@@ -1671,7 +1671,7 @@ static const struct file_operations rc_proc_dipm_fops = {
     .open       = rc_proc_dipm_open,
     .read       = seq_read,
     .llseek     = seq_lseek,
-    .write	    = rc_proc_write_dipm,
+    .write	= rc_proc_write_dipm,
     .release    = single_release,
 };
 #else
@@ -1714,7 +1714,7 @@ static const struct file_operations rc_proc_hipm_fops = {
     .open       = rc_proc_hipm_open,
     .read       = seq_read,
     .llseek     = seq_lseek,
-    .write	    = rc_proc_write_hipm,
+    .write      = rc_proc_write_hipm,
     .release    = single_release,
 };
 #else
@@ -1877,7 +1877,7 @@ static const struct file_operations rc_proc_zpodd_fops = {
     .open       = rc_proc_zpodd_open,
     .read       = seq_read,
     .llseek     = seq_lseek,
-    .write	    = rc_proc_write_zpodd,
+    .write      = rc_proc_write_zpodd,
     .release    = single_release,
 };
 #else
@@ -1919,7 +1919,7 @@ static const struct file_operations rc_proc_delay_fops = {
     .open       = rc_proc_delay_open,
     .read       = seq_read,
     .llseek     = seq_lseek,
-    .write	    = rc_proc_write_delay,
+    .write      = rc_proc_write_delay,
     .release    = single_release,
 };
 #else
