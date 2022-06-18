@@ -20,13 +20,19 @@
  ****************************************************************************/
 
 #include "rc.h"
-#include "linux/sysrq.h"
-#include "linux/nmi.h"
+#include "rc_ahci.h"
 #include "asm/msr.h"
+
+#include <linux/version.h>
 #include <linux/page-flags.h>
 #include <linux/vmalloc.h>
+#include <linux/sysrq.h>
+#include <linux/nmi.h>
 #include <scsi/sg.h>
-#include "rc_ahci.h"
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,18,0)
+#include <linux/dma-mapping.h>
+#endif
 
 int  rc_setup_communications(void);
 void rc_send_msg(struct rc_send_arg_s *p_send_arg);
@@ -1116,9 +1122,16 @@ rc_msg_init(rc_softstate_t *state)
 		if (adapter == (rc_adapter_t *)0) {
 			rc_printk(RC_ERROR, "rc_msg_init null adapter\n");
 		}
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
 		addr = pci_alloc_consistent(adapter->pdev,
 					    state->memsize_per_controller,
 					    &adapter->private_mem.dma_address);
+#else
+		addr = dma_alloc_coherent(&adapter->pdev->dev, 
+								state->memsize_per_controller, 
+								&adapter->private_mem.dma_address, 
+								GFP_ATOMIC);
+#endif
 
 		if (addr == (void *)0) {
 			rc_printk(RC_ERROR,"rc_msg_init: can not alloc %d bytes of per "
@@ -1426,7 +1439,11 @@ rc_msg_send_srb(struct scsi_cmnd * scp)
 		rc_printk(RC_ERROR, "rc_msg_send_srb:  scatter-gather list too large "
 			  "(%d)\n", scsi_sg_count(scp));
  		scp->result = DID_NO_CONNECT << 16;
- 		scp->scsi_done(scp);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,16,0)
+ 		scsi_done(scp);
+#else
+		scp->scsi_done(scp);
+#endif
 		return 0;
 	}
 
@@ -1478,7 +1495,11 @@ rc_msg_send_srb(struct scsi_cmnd * scp)
 	/* the scsi_cmnd pointer points at our srb, at least until the command is
 	 * aborted
 	 */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 	scp->SCp.ptr = (void *)srb;
+#else
+	scp->host_scribble = (void *)srb;
+#endif
 
 	rc_msg_build_sg(srb);
 
@@ -1868,7 +1889,11 @@ rc_msg_srb_complete(struct rc_srb_s *srb)
 		return;
 	}
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
 	scp->SCp.ptr = NULL;
+#else
+	scp->host_scribble = NULL;
+#endif
 
 	if (srb->status == RC_SRB_STATUS_SUCCESS) {
 		 //rc_printk(RC_DEBUG2, "%s: seq_num %d SUCCESS\n", __FUNCTION__,
@@ -1876,7 +1901,11 @@ rc_msg_srb_complete(struct rc_srb_s *srb)
 		scp->result = DID_OK << 16 | COMMAND_COMPLETE << 8 | GOOD;
 
 		GET_IO_REQUEST_LOCK_IRQSAVE(irql);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,16,0)
+ 		scsi_done(scp);
+#else
 		scp->scsi_done(scp);
+#endif
 		PUT_IO_REQUEST_LOCK_IRQRESTORE(irql);
 		srb->seq_num = -1;
 		kfree(srb);
@@ -1895,7 +1924,11 @@ rc_msg_srb_complete(struct rc_srb_s *srb)
 			  srb->seq_num);
 		scp->result = DID_BAD_TARGET << 16;
 		GET_IO_REQUEST_LOCK_IRQSAVE(irql);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,16,0)
+ 		scsi_done(scp);
+#else
 		scp->scsi_done(scp);
+#endif
 		PUT_IO_REQUEST_LOCK_IRQRESTORE(irql);
 		srb->seq_num = -1;
 		kfree(srb);
@@ -1932,7 +1965,11 @@ rc_msg_srb_complete(struct rc_srb_s *srb)
 	}
 
 	GET_IO_REQUEST_LOCK_IRQSAVE(irql);
-	scp->scsi_done (scp);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,16,0)
+	scsi_done(scp);
+#else
+	scp->scsi_done(scp);
+#endif
 	PUT_IO_REQUEST_LOCK_IRQRESTORE(irql);
 	srb->seq_num = -1;
 	kfree(srb);
@@ -2191,8 +2228,17 @@ rc_msg_get_dma_memory(alloc_dma_address_t *dma_address)
     adapter = (rc_adapter_t *) dma_address->dev_handle;
     dmaHandle = (dma_addr_t*) &dma_address->dmaHandle;
 
-
-    dma_address->cpu_addr = pci_alloc_consistent(adapter->pdev,dma_address->bytes, dmaHandle );
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
+		dma_address->cpu_addr = pci_alloc_consistent(
+									adapter->pdev,
+									dma_address->bytes, 
+									dmaHandle);
+#else
+		dma_address->cpu_addr = dma_alloc_coherent(&adapter->pdev->dev, 
+								dma_address->bytes, 
+								dmaHandle, 
+								GFP_ATOMIC);
+#endif
 
     if (dma_address->cpu_addr)
     {
@@ -2203,7 +2249,12 @@ rc_msg_get_dma_memory(alloc_dma_address_t *dma_address)
 void
 rc_msg_free_dma_memory(rc_adapter_t	*adapter, void *cpu_addr, dma_addr_t dmaHandle, rc_uint32_t bytes)
 {
-    pci_free_consistent(adapter->pdev, bytes, cpu_addr, dmaHandle);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
+		pci_free_consistent(adapter->pdev, bytes, cpu_addr, dmaHandle);
+#else
+		dma_free_coherent(&adapter->pdev->dev, bytes, cpu_addr, dmaHandle);
+#endif
+    
 }
 
 void
@@ -2291,8 +2342,11 @@ rc_msg_map_mem(struct map_memory_s *map)
 			len_mapped = PAGE_SIZE - offset;
 			if (len < len_mapped)
 				len_mapped = len;
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
 			map->physical_address = dma_map_page(&adapter->pdev->dev, page, offset, len_mapped, PCI_DMA_BIDIRECTIONAL);
+#else
+			map->physical_address = dma_map_page(&adapter->pdev->dev, page, offset, len_mapped, DMA_BIDIRECTIONAL);
+#endif
             if (dma_mapping_error(&adapter->pdev->dev, map->physical_address))
             {
                 map->number_bytes = 0;
@@ -2303,7 +2357,12 @@ rc_msg_map_mem(struct map_memory_s *map)
     } else if ((map->memory_id & MEM_TYPE) == RC_MEM_DMA) {
         vaddr = (void *)(rc_uint_ptr_t)map->address;
 
-        map->physical_address = dma_map_single(&adapter->pdev->dev, vaddr, map->number_bytes, PCI_DMA_BIDIRECTIONAL);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
+		map->physical_address = dma_map_single(&adapter->pdev->dev, vaddr, map->number_bytes, PCI_DMA_BIDIRECTIONAL);
+#else
+		map->physical_address = dma_map_single(&adapter->pdev->dev, vaddr, map->number_bytes, DMA_BIDIRECTIONAL);
+#endif
+        
         if (dma_mapping_error(&adapter->pdev->dev, map->physical_address))
         {
             map->number_bytes = 0;

@@ -27,7 +27,7 @@
 #define RC_STHEXT_REDO_STRICT_TYPES
 #endif //int
 
-#include <stdarg.h>
+#include <linux/stdarg.h>
 
 #ifdef RC_STHEXT_REDO_STRICT_TYPES
 #define int Cannot_USE_int_because_it_is_ambiguous

@@ -4,11 +4,11 @@
  *
  ****************************************************************************/
 
+#include <linux/version.h>
 
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
-#include <linux/genhd.h>
 #include <linux/sched.h>
 #include <linux/completion.h>
 
@@ -26,6 +26,10 @@
 #include "rc_scsi.h"
 #include "rc_msg_platform.h"
 #include "rc_adapter.h"
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
+#include <linux/genhd.h>
+#endif
 
 #ifndef GFP_NOWAIT
 #define GFP_NOWAIT	(GFP_ATOMIC & ~__GFP_HIGH)
