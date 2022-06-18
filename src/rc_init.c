@@ -1415,7 +1415,7 @@ int rc_mpt2_shutdown(rc_adapter_t *adapter)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36)
 int rc_queue_cmd (struct scsi_cmnd * scp, void (*CompletionRoutine) (struct scsi_cmnd *))
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5,16,0)
-int rc_queue_cmd_lck(struct scsi_cmnd * scp);
+int rc_queue_cmd_lck(struct scsi_cmnd * scp)
 #else
 int rc_queue_cmd_lck (struct scsi_cmnd * scp, void (*CompletionRoutine) (struct scsi_cmnd *))
 #endif
