@@ -547,6 +547,21 @@ rc_init_adapter(struct pci_dev *dev, const struct pci_device_id *id)
 		rc_shutdown_adapter(adapter);
 		return -ENODEV;
 	}
+	#else
+	if (!dma_set_mask(&dev->dev, DMA_BIT_MASK(64)) &&
+	    !dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(64))) {
+		rc_printk(RC_NOTE, RC_DRIVER_NAME ": %s 64 bit DMA enabled\n",
+			  __FUNCTION__);
+	} else if (!dma_set_mask(&dev->dev, DMA_BIT_MASK(32)) &&
+		   !dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32))) {
+		rc_printk(RC_NOTE, RC_DRIVER_NAME ": %s 64 bit DMA disabled\n",
+			  __FUNCTION__);
+	} else {
+		rc_printk(RC_ERROR, RC_DRIVER_NAME ": %s failed to "
+			  "set usable DMA mask\n", __FUNCTION__);
+		rc_shutdown_adapter(adapter);
+		return -ENODEV;
+	}
 	#endif
 
 	/*
@@ -1459,7 +1474,7 @@ rc_eh_abort_cmd (struct scsi_cmnd * scp)
 		  scp, scp->device->channel, scp->device->id);
 	// rc_config_debug = 1;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0))
 	srb = (rc_srb_t *)scp->SCp.ptr;
 #else
 	srb = (rc_srb_t *)scp->host_scribble;
@@ -1471,7 +1486,7 @@ rc_eh_abort_cmd (struct scsi_cmnd * scp)
 			  srb->status, srb->flags, srb->bus, srb->target, srb->lun);
 		srb->scsi_context = NULL;
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0))
 		scp->SCp.ptr = NULL;
 #else
 		scp->host_scribble = NULL;

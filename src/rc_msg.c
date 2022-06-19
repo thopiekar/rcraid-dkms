@@ -1495,7 +1495,7 @@ rc_msg_send_srb(struct scsi_cmnd * scp)
 	/* the scsi_cmnd pointer points at our srb, at least until the command is
 	 * aborted
 	 */
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0))
 	scp->SCp.ptr = (void *)srb;
 #else
 	scp->host_scribble = (void *)srb;
@@ -1889,7 +1889,7 @@ rc_msg_srb_complete(struct rc_srb_s *srb)
 		return;
 	}
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 18, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0))
 	scp->SCp.ptr = NULL;
 #else
 	scp->host_scribble = NULL;
