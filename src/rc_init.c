@@ -39,6 +39,7 @@
 #include "version.h"
 #include "build_number.h"
 #include "rc_pci_ids.h"
+#include <linux/version.h>
 #include <linux/hdreg.h>
 #include <linux/reboot.h>
 #include <linux/pci.h>
@@ -48,6 +49,10 @@
 #include <linux/spinlock_types.h>
 #include <linux/sysctl.h>
 #include <linux/pm_runtime.h>
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,18,0)
+#include <linux/dma-mapping.h>
+#endif
 
 // FIXME: some older kernels still supported by RAIDCore do not have
 //        DMA_BIT_MASK().  Remove once support for them has been dropped.
@@ -184,6 +189,8 @@ int         rc_bios_params(struct scsi_device *sdev, struct block_device *bdev,
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36)
 int         rc_queue_cmd(struct scsi_cmnd * scp, void (*CompletionRoutine) (struct scsi_cmnd *));
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5,16,0)
+int         rc_queue_cmd_lck(struct scsi_cmnd * scp);
 #else
 int         rc_queue_cmd_lck(struct scsi_cmnd * scp, void (*CompletionRoutine) (struct scsi_cmnd *));
 #endif
@@ -525,6 +532,7 @@ rc_init_adapter(struct pci_dev *dev, const struct pci_device_id *id)
 	/*
 	 * set dma_mask to 64 bit capabilities but if that fails, try 32 bit
 	 */
+	#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
 	if (!pci_set_dma_mask(dev, DMA_BIT_MASK(64)) &&
 	    !pci_set_consistent_dma_mask(dev, DMA_BIT_MASK(64))) {
 		rc_printk(RC_NOTE, RC_DRIVER_NAME ": %s 64 bit DMA enabled\n",
@@ -539,6 +547,22 @@ rc_init_adapter(struct pci_dev *dev, const struct pci_device_id *id)
 		rc_shutdown_adapter(adapter);
 		return -ENODEV;
 	}
+	#else
+	if (!dma_set_mask(&dev->dev, DMA_BIT_MASK(64)) &&
+	    !dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(64))) {
+		rc_printk(RC_NOTE, RC_DRIVER_NAME ": %s 64 bit DMA enabled\n",
+			  __FUNCTION__);
+	} else if (!dma_set_mask(&dev->dev, DMA_BIT_MASK(32)) &&
+		   !dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(32))) {
+		rc_printk(RC_NOTE, RC_DRIVER_NAME ": %s 64 bit DMA disabled\n",
+			  __FUNCTION__);
+	} else {
+		rc_printk(RC_ERROR, RC_DRIVER_NAME ": %s failed to "
+			  "set usable DMA mask\n", __FUNCTION__);
+		rc_shutdown_adapter(adapter);
+		return -ENODEV;
+	}
+	#endif
 
 	/*
 	 * map in the adapter MMIO space
@@ -905,10 +929,17 @@ rc_shutdown_adapter(rc_adapter_t *adapter)
 	rc_printk(RC_DEBUG, "%s: free private_mem 0x%p\n",
 		  __FUNCTION__, adapter->private_mem.vaddr);
 	if (adapter->private_mem.vaddr)  {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0)
 		pci_free_consistent(adapter->pdev,
 				    rc_state.memsize_per_controller,
 				    adapter->private_mem.vaddr,
 				    adapter->private_mem.dma_address);
+#else
+		dma_free_coherent(&adapter->pdev->dev, 
+					rc_state.memsize_per_controller, 
+					adapter->private_mem.vaddr,
+					adapter->private_mem.dma_address);
+#endif
 	}
 
 	/* pci_disable_device(adapter->pdev); */
@@ -1102,14 +1133,19 @@ static int rcraid_resume_one(struct pci_dev *pdev)
 
         pci_restore_state(adapter->pdev);
 
-        pci_enable_device(adapter->pdev);
+        if (pci_enable_device(adapter->pdev) != -ENOMEM) {
+			if (adapter->version->start_func)
+			{
+				(*adapter->version->start_func)(adapter);
+			}
 
-        if (adapter->version->start_func)
-        {
-            (*adapter->version->start_func)(adapter);
-        }
-
-        state->adapter_is_suspended &= ~(1 << adapter->instance);
+			state->adapter_is_suspended &= ~(1 << adapter->instance);
+		}
+		else
+		{
+			rc_printk(RC_NOTE, RC_DRIVER_NAME ": Failed to enable pdev %p\n",
+		  		adapter->pdev);
+		}
     }
 
     //
@@ -1127,29 +1163,33 @@ static int rcraid_resume_one(struct pci_dev *pdev)
 
 	pci_restore_state(pdev);
 
-    pcim_enable_device(pdev);
+    if (pcim_enable_device(pdev) != -ENOMEM){
+		//
+		// and restart the core...
+		//
+		if (adapter->version->start_func)
+		{
+			(*adapter->version->start_func)(adapter);
+		}
 
-    //
-    // and restart the core...
-    //
-    if (adapter->version->start_func)
-    {
-		(*adapter->version->start_func)(adapter);
-    }
+		rc_msg_init_tasklets(state);
 
-    rc_msg_init_tasklets(state);
+		rc_start_all_threads();
 
-    rc_start_all_threads();
+		rc_event_init();
 
-    rc_event_init();
+		schedule_delayed_work(&state->resume_work,250);
 
-    schedule_delayed_work(&state->resume_work,250);
+		scsi_unblock_requests(rc_state.host_ptr);
 
-    scsi_unblock_requests(rc_state.host_ptr);
+		state->adapter_is_suspended &= ~(1 << adapter->instance);
 
-    state->adapter_is_suspended &= ~(1 << adapter->instance);
-
-    return 0;
+		return 0;
+	} else {
+		rc_printk(RC_NOTE, RC_DRIVER_NAME ": Failed to enable pdev %p\n",
+		  		adapter->pdev);
+		return -1;
+	}
 }
 #endif  /* CONFIG_PM */
 
@@ -1389,12 +1429,16 @@ int rc_mpt2_shutdown(rc_adapter_t *adapter)
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,36)
 int rc_queue_cmd (struct scsi_cmnd * scp, void (*CompletionRoutine) (struct scsi_cmnd *))
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5,16,0)
+int rc_queue_cmd_lck(struct scsi_cmnd * scp)
 #else
 int rc_queue_cmd_lck (struct scsi_cmnd * scp, void (*CompletionRoutine) (struct scsi_cmnd *))
 #endif
 
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,16,0)
 	scp->scsi_done = CompletionRoutine;
+#endif
 	//#define FAIL_ALL_IO 0
 
 #ifdef FAIL_ALL_IO
@@ -1430,13 +1474,24 @@ rc_eh_abort_cmd (struct scsi_cmnd * scp)
 		  scp, scp->device->channel, scp->device->id);
 	// rc_config_debug = 1;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0))
 	srb = (rc_srb_t *)scp->SCp.ptr;
+#else
+	srb = (rc_srb_t *)scp->host_scribble;
+#endif
+
 	if (srb != NULL) {
 		rc_printk(RC_DEBUG, "\tsrb: 0x%p seq_num %d function %x status %x "
 			  "flags %x b/t/l %d/%d/%d\n", srb, srb->seq_num, srb->function,
 			  srb->status, srb->flags, srb->bus, srb->target, srb->lun);
 		srb->scsi_context = NULL;
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,18,0))
 		scp->SCp.ptr = NULL;
+#else
+		scp->host_scribble = NULL;
+#endif
+
 	} else {
 		rc_printk(RC_WARN, "rc_eh_abort_cmd: srb already completed\n");
 		// most likely here because we already processed srb
