@@ -10,7 +10,10 @@ arch=('i686' 'x86_64')
 url="https://www.amd.com/en/support/chipsets/amd-socket-am4/x370"
 license=('GPL2')
 depends=('dkms')
-makedepends=('linux-headers>=4.15')
+optdepends=('linux-headers>=4.15: build modules against the Arch kernel'
+            'linux-lts-headers>=4.15: build modules against the LTS kernel'
+            'linux-zen-headers>=4.15: build modules against the ZEN kernel'
+            'linux-hardened-headers>=4.15: build modules against the HARDENED kernel')
 source=('dkms.conf')
 md5sums=('3a14dcc84daf257a62727bcde1882edf')
 
