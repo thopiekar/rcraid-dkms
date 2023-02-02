@@ -1,8 +1,7 @@
 #!/usr/bin/make -f
 #export DH_VERBOSE = 1
 
-VERSION ?= $(shell dpkg-parsechangelog |\
-	     sed -rne 's/^Version: ([0-9.]+)[-+].*$$/\1/p')
+VERSION ?= $(shell dpkg-parsechangelog --show-field Version)
 
 %:
 	dh $@
